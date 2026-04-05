@@ -21,6 +21,7 @@ export class WriteWorker {
     this._collection = collection;
     this._rateLimiter = rateLimiter;
     this._config = config;
+    this._uncapped = config.uncapped || false;
     this._stopped = false;
     this._running = false;
 
@@ -62,8 +63,7 @@ export class WriteWorker {
     while (!this._stopped) {
       try {
         if (mode === 'bulk') {
-          // Acquire tokens for the full batch
-          await this._rateLimiter.acquire(batchSize);
+          if (!this._uncapped) await this._rateLimiter.acquire(batchSize);
           const docs = generateDocuments(batchSize, docSizeKB, userPoolSize);
           const start = performance.now();
           await this._collection.insertMany(docs, {
@@ -74,8 +74,7 @@ export class WriteWorker {
           this.opsCount += batchSize;
           this.latencies.push(elapsed);
         } else {
-          // single mode
-          await this._rateLimiter.acquire(1);
+          if (!this._uncapped) await this._rateLimiter.acquire(1);
           const doc = generateDocument(docSizeKB, userPoolSize);
           const start = performance.now();
           await this._collection.insertOne(doc, {

@@ -250,6 +250,7 @@ export default function ConfigPage() {
   const [batchSize, setBatchSize] = useState(500);
   const [targetWriteRPS, setTargetWriteRPS] = useState(35000);
   const [writeConcern, setWriteConcern] = useState('w:majority');
+  const [uncapped, setUncapped] = useState(false);
 
   // -- Read Config --
   const [targetReadRPS, setTargetReadRPS] = useState(1500);
@@ -303,6 +304,7 @@ export default function ConfigPage() {
       batchSize: writeMode === 'bulk' ? batchSize : 1,
       targetWriteRPS,
       writeConcern,
+      uncapped,
       targetReadRPS,
       numSpikes,
       rampSeconds,
@@ -313,7 +315,7 @@ export default function ConfigPage() {
     }),
     [
       mongoUri, dbName, collectionName, poolSize, docSize, userPoolSize,
-      indexProfile, writeMode, batchSize, targetWriteRPS, writeConcern,
+      indexProfile, writeMode, batchSize, targetWriteRPS, writeConcern, uncapped,
       targetReadRPS, numSpikes, rampSeconds, sustainSeconds, gapSeconds,
       dropCollection,
     ],
@@ -602,6 +604,17 @@ export default function ConfigPage() {
             w:majority
           </div>
         </div>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={uncapped}
+            onChange={(e) => setUncapped(e.target.checked)}
+            className="accent-indigo-500 w-4 h-4"
+          />
+          <span className="text-sm text-gray-300">Uncapped mode</span>
+          <span className="text-xs text-gray-500">(no rate limiter — find max throughput)</span>
+        </label>
       </Section>
 
       {/* ---------------------------------------------------------------- */}

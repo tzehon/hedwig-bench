@@ -162,6 +162,7 @@ export class RunManager {
         userPoolSize: this._config.userPoolSize,
         writeConcern,
         concurrency: this._config.writeConcurrency,
+        uncapped: this._config.uncapped || false,
       });
 
       this._reader = new ReadWorker(this._collection, this._readRateLimiter, {
