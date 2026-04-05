@@ -41,6 +41,7 @@ export class MetricsCollector {
 
     // Latest system metrics (refreshed every 5s)
     this._latestSystem = null;
+    this._prevOpcounters = null;
 
     // Current phase and target RPS (set externally by RunManager)
     this.phase = 'gap';
@@ -112,10 +113,24 @@ export class MetricsCollector {
     try {
       const status = await this._db.command({ serverStatus: 1 });
 
+      const currentInsert = status.opcounters?.insert ?? 0;
+      const currentQuery = status.opcounters?.query ?? 0;
+
+      // Compute per-second deltas from cumulative opcounters
+      let insertOpsPerSec = 0;
+      let queryOpsPerSec = 0;
+      if (this._prevOpcounters) {
+        // System metrics collected every 5 seconds
+        const elapsed = 5;
+        insertOpsPerSec = Math.round((currentInsert - this._prevOpcounters.insert) / elapsed);
+        queryOpsPerSec = Math.round((currentQuery - this._prevOpcounters.query) / elapsed);
+      }
+      this._prevOpcounters = { insert: currentInsert, query: currentQuery };
+
       this._latestSystem = {
         connections: status.connections?.current ?? 0,
-        insertOps: status.opcounters?.insert ?? 0,
-        queryOps: status.opcounters?.query ?? 0,
+        insertOps: insertOpsPerSec,
+        queryOps: queryOpsPerSec,
         cacheDirtyBytes:
           status.wiredTiger?.cache?.['tracked dirty bytes in the cache'] ?? 0,
         cacheBytes:
