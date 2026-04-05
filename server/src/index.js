@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import { createServer } from 'node:http';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
 import { WebSocketServer } from 'ws';
 import { URL } from 'node:url';
 
@@ -35,6 +38,18 @@ app.use('/api/search', searchRouter);
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
+
+// Serve built frontend in production
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const clientDist = join(__dirname, '..', '..', 'client', 'dist');
+if (existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  // SPA fallback: serve index.html for all non-API routes
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/ws')) return next();
+    res.sendFile(join(clientDist, 'index.html'));
+  });
+}
 
 // ────────────────────────────────────────────────────────────
 // 3. HTTP server
