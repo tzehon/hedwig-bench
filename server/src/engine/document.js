@@ -45,40 +45,41 @@ function randomHex(bytes) {
 }
 
 function randomUserId(userPoolSize) {
-  const num = randomInt(1, userPoolSize + 1);
+  const num = 1 + Math.floor(Math.random() * userPoolSize);
   return `user_${String(num).padStart(6, '0')}`;
 }
 
 function randomSubject() {
-  return SUBJECT_LINES[randomInt(0, SUBJECT_LINES.length)];
+  return SUBJECT_LINES[Math.floor(Math.random() * SUBJECT_LINES.length)];
 }
 
 function randomStatus() {
-  return STATUSES[randomInt(0, STATUSES.length)];
+  return STATUSES[Math.floor(Math.random() * STATUSES.length)];
+}
+
+// Pre-generate a large padding string to slice from (avoids per-doc random loops)
+const PADDING_BLOCK_SIZE = 64 * 1024; // 64 KB
+let _paddingBlock = null;
+
+function getPaddingBlock() {
+  if (_paddingBlock) return _paddingBlock;
+  const chunks = [];
+  let size = 0;
+  while (size < PADDING_BLOCK_SIZE) {
+    const word = BODY_WORDS[Math.floor(Math.random() * BODY_WORDS.length)];
+    chunks.push(word);
+    size += word.length + 1;
+  }
+  _paddingBlock = chunks.join(' ').slice(0, PADDING_BLOCK_SIZE);
+  return _paddingBlock;
 }
 
 function generateBodyText(targetBytes) {
-  // Build random body text by stringing together words until we reach target size
-  const chunks = [];
-  let currentSize = 0;
-
-  while (currentSize < targetBytes) {
-    const word = BODY_WORDS[randomInt(0, BODY_WORDS.length)];
-    chunks.push(word);
-    currentSize += word.length + 1; // +1 for space
-  }
-
-  let body = chunks.join(' ');
-
-  // Trim or pad to exact size
-  if (body.length > targetBytes) {
-    body = body.slice(0, targetBytes);
-  } else {
-    // Pad with spaces if slightly under
-    body = body.padEnd(targetBytes, ' ');
-  }
-
-  return body;
+  const block = getPaddingBlock();
+  // Pick a random offset into the padding block for variety
+  const maxOffset = block.length - targetBytes;
+  const offset = maxOffset > 0 ? Math.floor(Math.random() * maxOffset) : 0;
+  return block.slice(offset, offset + targetBytes);
 }
 
 /**
