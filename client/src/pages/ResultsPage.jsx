@@ -456,7 +456,7 @@ export default function ResultsPage() {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">p99 Latency (best)</span>
+              <span className="text-xs text-gray-400">p99 Latency</span>
               <span className={`text-sm font-mono font-semibold ${(summary.readP99Min || summary.readP99 || 0) < 50 ? 'text-green-400' : 'text-red-400'}`}>
                 {fmt(summary.readP99Min || summary.readP99)} ms
               </span>
