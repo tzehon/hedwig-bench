@@ -243,7 +243,7 @@ export default function ConfigPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
 
   // -- Index Profile --
-  const [indexProfile, setIndexProfile] = useState('ttl');
+  const [indexProfile] = useState('extended');
 
   // -- Write Config --
   const [writeMode, setWriteMode] = useState('bulk');
@@ -407,12 +407,6 @@ export default function ConfigPage() {
   const maskedUri =
     mongoUri.length > 20 ? mongoUri.slice(0, 20) + '...' : mongoUri;
 
-  // -- Index profile options --
-  const indexOptions = [
-    { value: 'minimal', label: 'Minimal (2 indexes)', desc: 'user_id + msg_id (point read), user_id + created_at (recent inbox)' },
-    { value: 'ttl', label: 'With TTL (3 indexes)', desc: 'Minimal + 60-day TTL on created_at' },
-    { value: 'extended', label: 'Extended (4 indexes)', desc: 'TTL + user_id + status + created_at (filtered inbox)' },
-  ];
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -514,37 +508,6 @@ export default function ConfigPage() {
           <pre className="bg-gray-900 border border-gray-700 rounded-md p-3 text-xs text-gray-300 font-mono overflow-auto max-h-56">
             {docPreview ? JSON.stringify(docPreview, null, 2) : 'No preview available'}
           </pre>
-        </div>
-      </Section>
-
-      {/* ---------------------------------------------------------------- */}
-      {/* Index Profile                                                    */}
-      {/* ---------------------------------------------------------------- */}
-      <Section title="Index Profile">
-        <div className="space-y-2">
-          {indexOptions.map((opt) => (
-            <label
-              key={opt.value}
-              className={`flex items-start gap-3 p-3 rounded-md cursor-pointer border transition-colors ${
-                indexProfile === opt.value
-                  ? 'border-indigo-500 bg-indigo-500/10'
-                  : 'border-gray-700 bg-gray-900 hover:border-gray-600'
-              }`}
-            >
-              <input
-                type="radio"
-                name="indexProfile"
-                value={opt.value}
-                checked={indexProfile === opt.value}
-                onChange={(e) => setIndexProfile(e.target.value)}
-                className="mt-0.5 accent-indigo-500"
-              />
-              <div>
-                <div className="text-sm text-white font-medium">{opt.label}</div>
-                <div className="text-xs text-gray-400">{opt.desc}</div>
-              </div>
-            </label>
-          ))}
         </div>
       </Section>
 
