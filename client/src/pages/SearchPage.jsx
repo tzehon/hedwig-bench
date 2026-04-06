@@ -840,7 +840,7 @@ export default function SearchPage() {
             )}
 
             {/* Before-search empty state with suggested searches */}
-            {results === null && !hasSearched.current && (
+            {(results === null || (results && results.length === 0 && !query)) && (
               <div className="py-12">
                 <SearchIcon className="w-10 h-10 text-gray-700 mx-auto mb-4" />
                 <p className="text-gray-400 text-sm text-center mb-6">
