@@ -174,7 +174,7 @@ function DiceIcon() {
 // ---------------------------------------------------------------------------
 export default function QueryPage() {
   // -- Connection state --
-  const [mongoUri, setMongoUri] = useState('');
+  const [mongoUri, setMongoUri] = useState(import.meta.env.VITE_MONGO_URI || '');
   const [uriVisible, setUriVisible] = useState(false);
   const [dbName, setDbName] = useState('hedwig_bench');
   const [collectionName, setCollectionName] = useState('inbox');
