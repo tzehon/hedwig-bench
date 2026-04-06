@@ -18,7 +18,7 @@ const PHASE_COLORS = {
   sustain: 'bg-green-500/20 text-green-300 border-green-500/30',
   cooldown: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
   gap: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
-  complete: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+  complete: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
 };
 
 // ---------------------------------------------------------------------------
@@ -432,7 +432,7 @@ export default function LiveDashboard() {
             {isFinished ? (
               <button
                 onClick={() => navigate(`/results/${id}`)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-md transition-colors"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-md transition-colors"
               >
                 View Results
               </button>
@@ -456,7 +456,7 @@ export default function LiveDashboard() {
           </div>
           <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
             <div
-              className="bg-indigo-500 h-2 rounded-full transition-all duration-500 ease-out"
+              className="bg-emerald-500 h-2 rounded-full transition-all duration-500 ease-out"
               style={{ width: `${progressPct}%` }}
             />
           </div>

@@ -51,7 +51,7 @@ function TextInput({ id, value, onChange, placeholder, required, type = 'text', 
       onChange={onChange}
       placeholder={placeholder}
       required={required}
-      className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+      className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
       {...rest}
     />
   );
@@ -62,7 +62,7 @@ function RangeSlider({ id, value, onChange, min, max, step = 1, label, unit = ''
     <div>
       <div className="flex items-center justify-between mb-1">
         <Label htmlFor={id}>{label}</Label>
-        <span className="text-sm font-mono text-indigo-300">
+        <span className="text-sm font-mono text-emerald-300">
           {Number(value).toLocaleString()}{unit}
         </span>
       </div>
@@ -74,7 +74,7 @@ function RangeSlider({ id, value, onChange, min, max, step = 1, label, unit = ''
         step={step}
         value={value}
         onChange={onChange}
-        className="w-full accent-indigo-500"
+        className="w-full accent-emerald-500"
       />
       <div className="flex justify-between text-xs text-gray-500 mt-0.5">
         <span>{Number(min).toLocaleString()}{unit}</span>
@@ -502,7 +502,7 @@ export default function ConfigPage() {
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm text-gray-400">Live document preview</span>
             {previewLoading && (
-              <span className="text-xs text-indigo-400 animate-pulse">loading...</span>
+              <span className="text-xs text-emerald-400 animate-pulse">loading...</span>
             )}
           </div>
           <pre className="bg-gray-900 border border-gray-700 rounded-md p-3 text-xs text-gray-300 font-mono overflow-auto max-h-56">
@@ -527,7 +527,7 @@ export default function ConfigPage() {
                   onClick={() => setWriteMode(mode)}
                   className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
                     writeMode === mode
-                      ? 'bg-indigo-600 text-white'
+                      ? 'bg-emerald-600 text-white'
                       : 'bg-gray-900 text-gray-400 hover:text-gray-200'
                   }`}
                 >
@@ -574,7 +574,7 @@ export default function ConfigPage() {
             type="checkbox"
             checked={uncapped}
             onChange={(e) => setUncapped(e.target.checked)}
-            className="accent-indigo-500 w-4 h-4"
+            className="accent-emerald-500 w-4 h-4"
           />
           <span className="text-sm text-gray-300">Uncapped mode</span>
           <span className="text-xs text-gray-500">(no rate limiter — find max throughput)</span>
@@ -675,7 +675,7 @@ export default function ConfigPage() {
               key={opt.value}
               className={`flex items-start gap-3 p-2.5 rounded-md cursor-pointer border transition-colors ${
                 dropMode === opt.value
-                  ? 'border-indigo-500 bg-indigo-500/10'
+                  ? 'border-emerald-500 bg-emerald-500/10'
                   : 'border-gray-700 bg-gray-900 hover:border-gray-600'
               }`}
             >
@@ -685,7 +685,7 @@ export default function ConfigPage() {
                 value={opt.value}
                 checked={dropMode === opt.value}
                 onChange={(e) => setDropMode(e.target.value)}
-                className="mt-0.5 accent-indigo-500"
+                className="mt-0.5 accent-emerald-500"
               />
               <div>
                 <div className="text-sm text-white">{opt.label}</div>
@@ -700,7 +700,7 @@ export default function ConfigPage() {
             type="button"
             onClick={() => handleStart()}
             disabled={submitting}
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-md transition-colors"
+            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-md transition-colors"
           >
             {submitting ? 'Starting...' : 'Start Benchmark'}
           </button>
@@ -729,7 +729,7 @@ export default function ConfigPage() {
             type="checkbox"
             checked={clearHistory}
             onChange={(e) => setClearHistory(e.target.checked)}
-            className="accent-indigo-500 w-4 h-4"
+            className="accent-emerald-500 w-4 h-4"
           />
           <span className="text-sm text-gray-300">Also clear local run history</span>
         </label>

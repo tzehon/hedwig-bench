@@ -122,7 +122,7 @@ function Spinner({ text }) {
     <div className="flex items-center justify-center min-h-[50vh]">
       <div className="flex flex-col items-center gap-3">
         <svg
-          className="animate-spin h-8 w-8 text-indigo-400"
+          className="animate-spin h-8 w-8 text-emerald-400"
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
           viewBox="0 0 24 24"
@@ -362,7 +362,7 @@ export default function HistoryPage() {
           </p>
           <Link
             to="/"
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-md transition-colors inline-block"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-md transition-colors inline-block"
           >
             Configure a Benchmark
           </Link>
@@ -403,7 +403,7 @@ export default function HistoryPage() {
               disabled={!canCompare || compareLoading}
               className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
                 canCompare
-                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                   : 'bg-gray-700 text-gray-500 cursor-not-allowed'
               }`}
             >
@@ -497,7 +497,7 @@ export default function HistoryPage() {
                   <tr
                     key={id}
                     className={`border-t border-gray-800 transition-colors ${
-                      isSelected ? 'bg-indigo-950/30' : 'hover:bg-gray-800/50'
+                      isSelected ? 'bg-emerald-950/30' : 'hover:bg-gray-800/50'
                     }`}
                   >
                     {/* Checkbox */}
@@ -506,7 +506,7 @@ export default function HistoryPage() {
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleSelect(id)}
-                        className="accent-indigo-500 w-4 h-4 rounded cursor-pointer"
+                        className="accent-emerald-500 w-4 h-4 rounded cursor-pointer"
                       />
                     </td>
 
@@ -514,7 +514,7 @@ export default function HistoryPage() {
                     <td className="px-4 py-3">
                       <Link
                         to={`/results/${id}`}
-                        className="text-indigo-400 hover:text-indigo-300 font-mono text-xs transition-colors"
+                        className="text-emerald-400 hover:text-emerald-300 font-mono text-xs transition-colors"
                       >
                         {truncateId(id)}
                       </Link>
@@ -824,7 +824,7 @@ export default function HistoryPage() {
                             <td
                               key={i}
                               className={`px-5 py-2.5 text-xs font-mono text-gray-200 ${
-                                isDiff ? 'bg-indigo-900/30' : ''
+                                isDiff ? 'bg-emerald-900/30' : ''
                               }`}
                             >
                               {val != null ? String(val) : '--'}
@@ -865,7 +865,7 @@ export default function HistoryPage() {
                             return (
                               <td
                                 key={i}
-                                className={`px-5 py-2.5 ${isDiff ? 'bg-indigo-900/30' : ''}`}
+                                className={`px-5 py-2.5 ${isDiff ? 'bg-emerald-900/30' : ''}`}
                               >
                                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                                   isPass
@@ -883,7 +883,7 @@ export default function HistoryPage() {
                             <td
                               key={i}
                               className={`px-5 py-2.5 text-xs font-mono text-gray-200 ${
-                                isDiff ? 'bg-indigo-900/30' : ''
+                                isDiff ? 'bg-emerald-900/30' : ''
                               }`}
                             >
                               {formatted}

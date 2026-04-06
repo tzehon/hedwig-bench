@@ -94,8 +94,8 @@ function truncateBody(val) {
 function formatJsonValue(val, depth = 0) {
   if (val === null) return <span className="text-gray-500">null</span>;
   if (val === undefined) return <span className="text-gray-500">undefined</span>;
-  if (typeof val === 'boolean') return <span className="text-indigo-300">{val.toString()}</span>;
-  if (typeof val === 'number') return <span className="text-indigo-300">{val}</span>;
+  if (typeof val === 'boolean') return <span className="text-emerald-300">{val.toString()}</span>;
+  if (typeof val === 'number') return <span className="text-emerald-300">{val}</span>;
   if (typeof val === 'string') return <span className="text-green-300">"{val}"</span>;
   return null;
 }
@@ -387,7 +387,7 @@ export default function QueryPage() {
                     value={mongoUri}
                     onChange={(e) => setMongoUri(e.target.value)}
                     placeholder="mongodb+srv://..."
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 pr-10"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 pr-10"
                   />
                   <button
                     type="button"
@@ -406,7 +406,7 @@ export default function QueryPage() {
                   type="text"
                   value={dbName}
                   onChange={(e) => setDbName(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
@@ -417,7 +417,7 @@ export default function QueryPage() {
                   type="text"
                   value={collectionName}
                   onChange={(e) => setCollectionName(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
             </div>
@@ -429,7 +429,7 @@ export default function QueryPage() {
             <button
               onClick={handleConnect}
               disabled={connecting}
-              className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-600/50 text-white text-sm font-medium rounded-lg transition-colors"
+              className="mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/50 text-white text-sm font-medium rounded-lg transition-colors"
             >
               {connecting ? 'Connecting...' : 'Connect'}
             </button>
@@ -453,7 +453,7 @@ export default function QueryPage() {
                 }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
                   selectedType === qt.id
-                    ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-300'
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
                     : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-gray-200 hover:border-gray-700'
                 }`}
               >
@@ -478,7 +478,7 @@ export default function QueryPage() {
                     <select
                       value={queryParams.userId}
                       onChange={(e) => setQueryParams((p) => ({ ...p, userId: e.target.value }))}
-                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-emerald-500"
                     >
                       <option value="">Select...</option>
                       {sampleUsers.map((u) => (
@@ -488,7 +488,7 @@ export default function QueryPage() {
                     <button
                       onClick={randomizeUserId}
                       title="Random user_id"
-                      className="px-2 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-indigo-300 hover:border-indigo-500/50 transition-colors"
+                      className="px-2 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-emerald-300 hover:border-emerald-500/50 transition-colors"
                     >
                       <DiceIcon />
                     </button>
@@ -504,7 +504,7 @@ export default function QueryPage() {
                     <select
                       value={queryParams.msgId}
                       onChange={(e) => setQueryParams((p) => ({ ...p, msgId: e.target.value }))}
-                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-emerald-500"
                     >
                       <option value="">Select...</option>
                       {sampleMsgIds.map((m) => (
@@ -514,7 +514,7 @@ export default function QueryPage() {
                     <button
                       onClick={randomizeMsgId}
                       title="Random msg_id"
-                      className="px-2 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-indigo-300 hover:border-indigo-500/50 transition-colors"
+                      className="px-2 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-emerald-300 hover:border-emerald-500/50 transition-colors"
                     >
                       <DiceIcon />
                     </button>
@@ -530,7 +530,7 @@ export default function QueryPage() {
                     <select
                       value={queryParams.status}
                       onChange={(e) => setQueryParams((p) => ({ ...p, status: e.target.value }))}
-                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-emerald-500"
                     >
                       {STATUSES.map((s) => (
                         <option key={s} value={s}>{s}</option>
@@ -539,7 +539,7 @@ export default function QueryPage() {
                     <button
                       onClick={randomizeStatus}
                       title="Random status"
-                      className="px-2 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-indigo-300 hover:border-indigo-500/50 transition-colors"
+                      className="px-2 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-emerald-300 hover:border-emerald-500/50 transition-colors"
                     >
                       <DiceIcon />
                     </button>
@@ -557,7 +557,7 @@ export default function QueryPage() {
                     max={100}
                     value={queryParams.limit}
                     onChange={(e) => setQueryParams((p) => ({ ...p, limit: e.target.value }))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-emerald-500"
                   />
                 </div>
               )}
@@ -566,7 +566,7 @@ export default function QueryPage() {
               <button
                 onClick={handleRunQuery}
                 disabled={running}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-600/50 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/50 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
               >
                 {running ? (
                   <>
@@ -729,7 +729,7 @@ export default function QueryPage() {
                 {QUERY_TYPES.map((qt) => (
                   <div
                     key={qt.id}
-                    className="bg-gray-900 border border-gray-800 rounded-lg p-4 cursor-pointer hover:border-indigo-500/30 transition-colors"
+                    className="bg-gray-900 border border-gray-800 rounded-lg p-4 cursor-pointer hover:border-emerald-500/30 transition-colors"
                     onClick={() => setSelectedType(qt.id)}
                   >
                     <div className="flex items-center gap-2 mb-1">
@@ -774,7 +774,7 @@ function ScyllaComparison({ type }) {
       {info.query && (
         <div>
           <p className="text-xs text-gray-500 mb-1">Scylla CQL:</p>
-          <code className="block bg-gray-950 border border-gray-800 rounded-lg p-3 font-mono text-xs text-indigo-300 overflow-x-auto">
+          <code className="block bg-gray-950 border border-gray-800 rounded-lg p-3 font-mono text-xs text-emerald-300 overflow-x-auto">
             {info.query}
           </code>
         </div>

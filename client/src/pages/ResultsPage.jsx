@@ -238,7 +238,7 @@ export default function ResultsPage() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="flex flex-col items-center gap-3">
           <svg
-            className="animate-spin h-8 w-8 text-indigo-400"
+            className="animate-spin h-8 w-8 text-emerald-400"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -285,7 +285,7 @@ export default function ResultsPage() {
           </p>
           <Link
             to={`/run/${id}`}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-md transition-colors inline-block"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-md transition-colors inline-block"
           >
             Go to Live Dashboard
           </Link>

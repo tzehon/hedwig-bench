@@ -126,7 +126,7 @@ function ChevronIcon({ open }) {
 // ---------------------------------------------------------------------------
 function CapabilityCard({ title, description }) {
   return (
-    <div className="bg-gray-900/50 border-l-2 border-indigo-500 rounded-r-lg p-3">
+    <div className="bg-gray-900/50 border-l-2 border-emerald-500 rounded-r-lg p-3">
       <h4 className="text-sm font-semibold text-gray-200 mb-1">{title}</h4>
       <p className="text-sm text-gray-400 leading-relaxed">{description}</p>
     </div>
@@ -505,7 +505,7 @@ export default function SearchPage() {
                   value={mongoUri}
                   onChange={(e) => setMongoUri(e.target.value)}
                   placeholder="mongodb+srv://user:pass@cluster.mongodb.net"
-                  className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               )}
             </div>
@@ -519,7 +519,7 @@ export default function SearchPage() {
                   value={dbName}
                   onChange={(e) => setDbName(e.target.value)}
                   disabled={connected}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-50"
                 />
               </div>
               <div>
@@ -529,7 +529,7 @@ export default function SearchPage() {
                   value={collectionName}
                   onChange={(e) => setCollectionName(e.target.value)}
                   disabled={connected}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-50"
                 />
               </div>
             </div>
@@ -541,7 +541,7 @@ export default function SearchPage() {
                   type="button"
                   onClick={handleConnect}
                   disabled={connecting}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-md transition-colors"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-md transition-colors"
                 >
                   {connecting ? 'Connecting...' : 'Connect'}
                 </button>
@@ -608,7 +608,7 @@ export default function SearchPage() {
                       type="button"
                       onClick={handleCreateIndex}
                       disabled={indexCreating}
-                      className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-md transition-colors"
+                      className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-md transition-colors"
                     >
                       {indexCreating ? 'Creating...' : 'Create Search Index'}
                     </button>
@@ -668,12 +668,12 @@ export default function SearchPage() {
                     if (suggestions.length > 0) setShowSuggestions(true);
                   }}
                   placeholder="Search messages..."
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-12 pr-24 py-3.5 text-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-12 pr-24 py-3.5 text-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
                 <button
                   type="submit"
                   disabled={searching || !query.trim()}
-                  className="absolute inset-y-0 right-0 flex items-center px-5 text-sm font-semibold text-indigo-300 hover:text-indigo-200 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                  className="absolute inset-y-0 right-0 flex items-center px-5 text-sm font-semibold text-emerald-300 hover:text-emerald-200 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
                 >
                   {searching ? 'Searching...' : 'Search'}
                 </button>
@@ -708,7 +708,7 @@ export default function SearchPage() {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-gray-900 border border-gray-700 rounded-md px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="bg-gray-900 border border-gray-700 rounded-md px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               >
                 <option value="">All statuses</option>
                 <option value="delivered">delivered</option>
@@ -721,7 +721,7 @@ export default function SearchPage() {
                 value={filterUserId}
                 onChange={(e) => setFilterUserId(e.target.value)}
                 placeholder="e.g. user_000001"
-                className="bg-gray-900 border border-gray-700 rounded-md px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-36"
+                className="bg-gray-900 border border-gray-700 rounded-md px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent w-36"
               />
 
               <div className="flex items-center gap-1.5 text-sm text-gray-400">
@@ -730,7 +730,7 @@ export default function SearchPage() {
                   type="date"
                   value={filterDateFrom}
                   onChange={(e) => setFilterDateFrom(e.target.value)}
-                  className="bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>
 
@@ -740,7 +740,7 @@ export default function SearchPage() {
                   type="date"
                   value={filterDateTo}
                   onChange={(e) => setFilterDateTo(e.target.value)}
-                  className="bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="bg-gray-900 border border-gray-700 rounded-md px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>
 
@@ -748,7 +748,7 @@ export default function SearchPage() {
                 <button
                   type="button"
                   onClick={handleClearFilters}
-                  className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                  className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
                 >
                   Clear filters
                 </button>
@@ -860,9 +860,9 @@ export default function SearchPage() {
                       key={q}
                       type="button"
                       onClick={() => { setQuery(q); performSearch(q, 1); }}
-                      className="text-left p-3 rounded-lg bg-gray-900 border border-gray-800 hover:border-indigo-500/50 hover:bg-gray-800/80 transition-all group"
+                      className="text-left p-3 rounded-lg bg-gray-900 border border-gray-800 hover:border-emerald-500/50 hover:bg-gray-800/80 transition-all group"
                     >
-                      <span className="text-sm text-indigo-400 group-hover:text-indigo-300 font-medium">&ldquo;{q}&rdquo;</span>
+                      <span className="text-sm text-emerald-400 group-hover:text-emerald-300 font-medium">&ldquo;{q}&rdquo;</span>
                       <span className="block text-xs text-gray-500 mt-1">{desc}</span>
                     </button>
                   ))}
@@ -927,7 +927,7 @@ export default function SearchPage() {
           <button
             type="button"
             onClick={() => setConnectionOpen(true)}
-            className="mt-3 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+            className="mt-3 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
           >
             Open connection settings
           </button>
