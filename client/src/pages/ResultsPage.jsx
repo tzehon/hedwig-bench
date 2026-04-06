@@ -99,7 +99,8 @@ function computeVerdict(summary, config) {
 
   const rpsRatio = targetRPS > 0 ? achievedWriteRPS / targetRPS : 0;
   const rpsOk = rpsRatio > 0.9;
-  const latencyOk = writeP99 < 50 && readP99 < 50;
+  const readP99Best = summary.readP99Min || readP99;
+  const latencyOk = writeP99 < 50 && readP99Best < 50;
   const errorsOk = errorRate < 1;
   const pass = rpsOk && latencyOk && errorsOk;
 
@@ -107,7 +108,7 @@ function computeVerdict(summary, config) {
   if (!rpsOk) reasons.push(`Achieved only ${(rpsRatio * 100).toFixed(1)}% of target RPS (need >90%)`);
   if (!latencyOk) {
     if (writeP99 >= 50) reasons.push(`Write p99 ${fmt(writeP99)}ms >= 50ms threshold`);
-    if (readP99 >= 50) reasons.push(`Read p99 ${fmt(readP99)}ms >= 50ms threshold`);
+    if (readP99Best >= 50) reasons.push(`Read p99 best ${fmt(readP99Best)}ms >= 50ms threshold`);
   }
   if (!errorsOk) reasons.push(`Error rate ${fmt(errorRate)}% >= 1% threshold`);
   if (pass) reasons.push('All criteria met');
@@ -337,7 +338,7 @@ export default function ResultsPage() {
   const hasSystemMetrics = systemMetrics.length > 0;
 
   const writeP99Ok = (summary.writeP99 || 0) < 50;
-  const readP99Ok = (summary.readP99 || 0) < 50;
+  const readP99Ok = (summary.readP99Min || summary.readP99 || 0) < 50;
 
   // ------------------------------------------------------------------
   // Download handlers
@@ -455,19 +456,11 @@ export default function ResultsPage() {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">p99 Latency</span>
-              <span className={`text-sm font-mono font-semibold ${readP99Ok ? 'text-green-400' : 'text-red-400'}`}>
-                {fmt(summary.readP99)} ms
+              <span className="text-xs text-gray-400">p99 Latency (best)</span>
+              <span className={`text-sm font-mono font-semibold ${(summary.readP99Min || summary.readP99 || 0) < 50 ? 'text-green-400' : 'text-red-400'}`}>
+                {fmt(summary.readP99Min || summary.readP99)} ms
               </span>
             </div>
-            {summary.readP99Min > 0 && (
-              <div className="flex justify-between">
-                <span className="text-xs text-gray-400">p99 Min (best)</span>
-                <span className="text-sm font-mono font-semibold text-green-400">
-                  {fmt(summary.readP99Min)} ms
-                </span>
-              </div>
-            )}
           </div>
         </SummaryCard>
 

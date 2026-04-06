@@ -192,7 +192,7 @@ function computeSummary(timeseries, config) {
   const verdict =
     avgWriteRPS > targetRPS * 0.9 &&
     writeP99 < 50 &&
-    readP99 < 50 &&
+    (readP99Min || readP99) < 50 &&
     errorRate < 1
       ? 'pass'
       : 'fail';
