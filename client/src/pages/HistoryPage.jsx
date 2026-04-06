@@ -53,17 +53,6 @@ function formatDate(iso) {
   }
 }
 
-function computeVerdict(summary, config) {
-  if (!summary || !config) return { pass: false };
-  const targetRPS = config.targetWriteRPS || 0;
-  const achievedWriteRPS = summary.avgWriteRPS || 0;
-  const writeP99 = summary.writeP99 || 0;
-  const readP99 = summary.readP99 || 0;
-  const errorRate = summary.errorRate || 0;
-  const rpsRatio = targetRPS > 0 ? achievedWriteRPS / targetRPS : 0;
-  const pass = rpsRatio > 0.9 && writeP99 < 50 && readP99 < 50 && errorRate < 1;
-  return { pass };
-}
 
 // ---------------------------------------------------------------------------
 // Custom Tooltip (reused from project convention)
@@ -180,7 +169,6 @@ const PERF_FIELDS = [
   { key: 'avgReadRPS', label: 'Read RPS', path: 'summary', format: fmtRPS },
   { key: 'readP99', label: 'Read p99 (ms)', path: 'summary', format: (v) => fmt(v) },
   { key: 'errorRate', label: 'Error Rate (%)', path: 'summary', format: (v) => fmt(v) },
-  { key: 'verdict', label: 'Verdict', path: 'computed' },
 ];
 
 function getFieldValue(run, field) {
@@ -189,10 +177,6 @@ function getFieldValue(run, field) {
   }
   if (field.path === 'summary') {
     return (run.summary || {})[field.key];
-  }
-  if (field.path === 'computed' && field.key === 'verdict') {
-    const v = computeVerdict(run.summary, run.config);
-    return v.pass ? 'PASS' : 'FAIL';
   }
   return undefined;
 }
@@ -485,7 +469,6 @@ export default function HistoryPage() {
                 <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Index Profile</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Peak Write RPS</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">p99 Write Lat.</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Verdict</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider w-16">Actions</th>
               </tr>
             </thead>
@@ -494,7 +477,6 @@ export default function HistoryPage() {
                 const id = run.id || run._id;
                 const config = run.config || {};
                 const summary = run.summary || {};
-                const verdict = computeVerdict(summary, config);
                 const isSelected = selected.has(id);
                 const statusClass = STATUS_STYLES[run.status] || STATUS_STYLES.failed;
 
@@ -568,20 +550,6 @@ export default function HistoryPage() {
                       </span>
                     </td>
 
-                    {/* Verdict */}
-                    <td className="px-4 py-3">
-                      {summary.peakWriteRPS != null ? (
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          verdict.pass
-                            ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                            : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                        }`}>
-                          {verdict.pass ? 'PASS' : 'FAIL'}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-500">--</span>
-                      )}
-                    </td>
 
                     {/* Actions */}
                     <td className="px-4 py-3">
@@ -863,26 +831,6 @@ export default function HistoryPage() {
                         </td>
                         {compareData.map((run, i) => {
                           const val = getFieldValue(run, field);
-                          const isVerdict = field.key === 'verdict';
-
-                          if (isVerdict) {
-                            const isPass = val === 'PASS';
-                            return (
-                              <td
-                                key={i}
-                                className={`px-5 py-2.5 ${isDiff ? 'bg-emerald-900/30' : ''}`}
-                              >
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                                  isPass
-                                    ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                                    : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                                }`}>
-                                  {val}
-                                </span>
-                              </td>
-                            );
-                          }
-
                           const formatted = field.format ? field.format(val) : (val != null ? String(val) : '--');
                           return (
                             <td

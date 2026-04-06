@@ -84,37 +84,6 @@ function SummaryCard({ title, borderColor, children }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Verdict logic
-// ---------------------------------------------------------------------------
-function computeVerdict(summary, config) {
-  if (!summary || !config) return { pass: false, reasons: ['No summary data available'] };
-
-  const targetRPS = config.targetWriteRPS || 0;
-  const achievedWriteRPS = summary.avgWriteRPS || 0;
-  const achievedReadRPS = summary.avgReadRPS || 0;
-  const writeP99 = summary.writeP99 || 0;
-  const readP99 = summary.readP99 || 0;
-  const errorRate = summary.errorRate || 0;
-
-  const rpsRatio = targetRPS > 0 ? achievedWriteRPS / targetRPS : 0;
-  const rpsOk = rpsRatio > 0.9;
-  const readP99Best = summary.readP99Min || readP99;
-  const latencyOk = writeP99 < 50 && readP99Best < 50;
-  const errorsOk = errorRate < 1;
-  const pass = rpsOk && latencyOk && errorsOk;
-
-  const reasons = [];
-  if (!rpsOk) reasons.push(`Achieved only ${(rpsRatio * 100).toFixed(1)}% of target RPS (need >90%)`);
-  if (!latencyOk) {
-    if (writeP99 >= 50) reasons.push(`Write p99 ${fmt(writeP99)}ms >= 50ms threshold`);
-    if (readP99Best >= 50) reasons.push(`Read p99 best ${fmt(readP99Best)}ms >= 50ms threshold`);
-  }
-  if (!errorsOk) reasons.push(`Error rate ${fmt(errorRate)}% >= 1% threshold`);
-  if (pass) reasons.push('All criteria met');
-
-  return { pass, reasons };
-}
 
 // ---------------------------------------------------------------------------
 // Download helpers
@@ -134,10 +103,10 @@ function downloadBlob(content, filename, mimeType) {
 function generateMarkdownReport(run) {
   const config = run.config || {};
   const summary = run.summary || {};
-  const verdict = computeVerdict(summary, config);
   const date = formatDate(run.createdAt || run.startedAt);
 
   let md = `# Hedwig Bench Report - ${date}\n\n`;
+  if (config.runName) md += `**Run:** ${config.runName}\n\n`;
 
   // Config summary
   md += `## Configuration\n\n`;
@@ -158,18 +127,10 @@ function generateMarkdownReport(run) {
   md += `| --- | --- |\n`;
   md += `| Peak Write RPS | ${fmt(summary.peakWriteRPS, 0)} |\n`;
   md += `| Avg Write RPS | ${fmt(summary.avgWriteRPS, 0)} |\n`;
-  md += `| Write p99 Latency | ${fmt(summary.writeP99)} ms |\n`;
+  md += `| Write p50 / p90 / p99 | ${fmt(summary.writeP50)} / ${fmt(summary.writeP90)} / ${fmt(summary.writeP99)} ms |\n`;
   md += `| Avg Read RPS | ${fmt(summary.avgReadRPS, 0)} |\n`;
-  md += `| Read p99 Latency | ${fmt(summary.readP99)} ms |\n`;
+  md += `| Read p50 / p90 / p99 | ${fmt(summary.readP50)} / ${fmt(summary.readP90)} / ${fmt(summary.readP99)} ms |\n`;
   md += `| Error Rate | ${fmt(summary.errorRate)}% |\n`;
-  md += `\n`;
-
-  // Verdict
-  md += `## Verdict\n\n`;
-  md += `**${verdict.pass ? 'PASS' : 'FAIL'}**\n\n`;
-  verdict.reasons.forEach((r) => {
-    md += `- ${r}\n`;
-  });
   md += `\n`;
 
   // Per-spike breakdown
@@ -302,7 +263,6 @@ export default function ResultsPage() {
   const summary = run?.summary || {};
   const rawTimeseries = run?.timeseries || run?.metrics || [];
   const perSpike = summary.perSpike || [];
-  const verdict = computeVerdict(summary, config);
 
   // Flatten nested timeseries data for Recharts
   const timeseries = rawTimeseries.map((d) => {
@@ -337,8 +297,6 @@ export default function ResultsPage() {
   const hasTimeseries = timeseries.length > 0;
   const hasSystemMetrics = systemMetrics.length > 0;
 
-  const writeP99Ok = (summary.writeP99 || 0) < 50;
-  const readP99Ok = (summary.readP99Min || summary.readP99 || 0) < 50;
 
   // ------------------------------------------------------------------
   // Download handlers
@@ -417,71 +375,50 @@ export default function ResultsPage() {
         </SummaryCard>
 
         {/* Write Performance Card */}
-        <SummaryCard
-          title="Write Performance"
-          borderColor={writeP99Ok ? '#22c55e' : '#ef4444'}
-        >
+        <SummaryCard title="Write Performance" borderColor="#6B7280">
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">Peak Write RPS</span>
-              <span className="text-sm text-gray-100 font-mono font-semibold">
-                {fmtRPS(summary.peakWriteRPS)}
-              </span>
+              <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.peakWriteRPS)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">Avg Sustain RPS</span>
-              <span className="text-sm text-gray-100 font-mono font-semibold">
-                {fmtRPS(summary.avgWriteRPS)}
-              </span>
+              <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.avgWriteRPS)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">p99 Latency</span>
-              <span className={`text-sm font-mono font-semibold ${writeP99Ok ? 'text-green-400' : 'text-red-400'}`}>
-                {fmt(summary.writeP99)} ms
-              </span>
+              <span className="text-xs text-gray-400">p50</span>
+              <span className="text-sm font-mono text-green-400">{fmt(summary.writeP50)} ms</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">p90</span>
+              <span className="text-sm font-mono text-yellow-400">{fmt(summary.writeP90)} ms</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">p99</span>
+              <span className="text-sm font-mono text-red-400">{fmt(summary.writeP99)} ms</span>
             </div>
           </div>
         </SummaryCard>
 
         {/* Read Performance Card */}
-        <SummaryCard
-          title="Read Performance"
-          borderColor={readP99Ok ? '#22c55e' : '#ef4444'}
-        >
+        <SummaryCard title="Read Performance" borderColor="#6B7280">
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">Achieved Read RPS</span>
-              <span className="text-sm text-gray-100 font-mono font-semibold">
-                {fmtRPS(summary.avgReadRPS)}
-              </span>
+              <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.avgReadRPS)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">p99 Latency</span>
-              <span className={`text-sm font-mono font-semibold ${(summary.readP99Min || summary.readP99 || 0) < 50 ? 'text-green-400' : 'text-red-400'}`}>
-                {fmt(summary.readP99Min || summary.readP99)} ms
-              </span>
+              <span className="text-xs text-gray-400">p50</span>
+              <span className="text-sm font-mono text-green-400">{fmt(summary.readP50)} ms</span>
             </div>
-          </div>
-        </SummaryCard>
-
-        {/* Verdict Card */}
-        <SummaryCard
-          title="Verdict"
-          borderColor={verdict.pass ? '#22c55e' : '#ef4444'}
-        >
-          <div className="flex flex-col items-center justify-center h-full">
-            <span
-              className={`text-3xl font-black tracking-wide ${
-                verdict.pass ? 'text-green-400' : 'text-red-400'
-              }`}
-            >
-              {verdict.pass ? 'PASS' : 'FAIL'}
-            </span>
-            <ul className="mt-3 space-y-1">
-              {verdict.reasons.map((r, i) => (
-                <li key={i} className="text-xs text-gray-400 text-center">{r}</li>
-              ))}
-            </ul>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">p90</span>
+              <span className="text-sm font-mono text-yellow-400">{fmt(summary.readP90)} ms</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">p99</span>
+              <span className="text-sm font-mono text-red-400">{fmt(summary.readP99)} ms</span>
+            </div>
           </div>
         </SummaryCard>
       </div>

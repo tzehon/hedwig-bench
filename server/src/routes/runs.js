@@ -112,7 +112,9 @@ function computeSummary(timeseries, config) {
   // Sustain-phase metrics for averages
   const sustainWriteOps = [];
   const sustainReadOps = [];
+  const sustainWriteP50s = [];
   const sustainWriteP99s = [];
+  const sustainReadP50s = [];
   const sustainReadP99s = [];
 
   // Per-spike accumulators
@@ -150,7 +152,9 @@ function computeSummary(timeseries, config) {
     if (phase === 'sustain') {
       sustainWriteOps.push(writeOps);
       sustainReadOps.push(readOps);
+      sustainWriteP50s.push(writeP50);
       sustainWriteP99s.push(writeP99);
+      sustainReadP50s.push(readP50);
       sustainReadP99s.push(readP99);
     }
 
@@ -174,28 +178,17 @@ function computeSummary(timeseries, config) {
     ? sustainReadOps.reduce((a, b) => a + b, 0) / sustainReadOps.length
     : 0;
 
-  // p99 across all sustain-phase seconds
+  // Percentiles across all sustain-phase seconds
+  const writeP50 = computePercentile(sustainWriteP50s, 50);
+  const writeP90 = computePercentile(sustainWriteP99s, 90);
   const writeP99 = computePercentile(sustainWriteP99s, 99);
+  const readP50 = computePercentile(sustainReadP50s, 50);
+  const readP90 = computePercentile(sustainReadP99s, 90);
   const readP99 = computePercentile(sustainReadP99s, 99);
-
-  // Minimum p99 read latency (best 1-second window during sustain)
-  const readP99Min = sustainReadP99s.length > 0
-    ? Math.min(...sustainReadP99s.filter((v) => v > 0))
-    : 0;
 
   const totalOps = totalWriteOps + totalReadOps;
   const totalErrors = totalWriteErrors + totalReadErrors;
   const errorRate = totalOps > 0 ? (totalErrors / totalOps) * 100 : 0;
-
-  // Verdict: pass if >90% target RPS, both p99 < 50ms, error rate < 1%
-  const targetRPS = config.targetWriteRPS || 1;
-  const verdict =
-    avgWriteRPS > targetRPS * 0.9 &&
-    writeP99 < 50 &&
-    (readP99Min || readP99) < 50 &&
-    errorRate < 1
-      ? 'pass'
-      : 'fail';
 
   const perSpike = perSpikeData.map((spike, i) => ({
     spikeIndex: i,
@@ -213,15 +206,17 @@ function computeSummary(timeseries, config) {
     peakWriteRPS,
     avgWriteRPS: Math.round(avgWriteRPS * 100) / 100,
     avgReadRPS: Math.round(avgReadRPS * 100) / 100,
+    writeP50: Math.round(writeP50 * 100) / 100,
+    writeP90: Math.round(writeP90 * 100) / 100,
     writeP99: Math.round(writeP99 * 100) / 100,
+    readP50: Math.round(readP50 * 100) / 100,
+    readP90: Math.round(readP90 * 100) / 100,
     readP99: Math.round(readP99 * 100) / 100,
-    readP99Min: Math.round((readP99Min || 0) * 100) / 100,
     totalWriteOps,
     totalReadOps,
     totalWriteErrors,
     totalReadErrors,
     errorRate: Math.round(errorRate * 1000) / 1000,
-    verdict,
     perSpike,
   };
 }
