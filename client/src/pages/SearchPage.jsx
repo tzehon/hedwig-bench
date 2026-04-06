@@ -663,7 +663,10 @@ export default function SearchPage() {
                   ref={searchInputRef}
                   type="text"
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    if (!e.target.value) { setResults(null); setTotalResults(0); }
+                  }}
                   onFocus={() => {
                     if (suggestions.length > 0) setShowSuggestions(true);
                   }}

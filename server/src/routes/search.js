@@ -345,11 +345,25 @@ router.post('/autocomplete', async (req, res) => {
           },
         },
       },
-      { $limit: 5 },
       {
         $project: {
           subject: 1,
           score: { $meta: 'searchScore' },
+        },
+      },
+      {
+        $group: {
+          _id: '$subject',
+          score: { $max: '$score' },
+        },
+      },
+      { $sort: { score: -1 } },
+      { $limit: 5 },
+      {
+        $project: {
+          _id: 0,
+          subject: '$_id',
+          score: 1,
         },
       },
     ];
