@@ -580,7 +580,7 @@ export default function ResultsPage() {
           {/* Latency Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Write Latency */}
-            <ChartCard title="Write Latency">
+            <ChartCard title="Write Latency (per batch)">
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={timeseries} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid {...chartGridProps} />
@@ -619,7 +619,7 @@ export default function ResultsPage() {
             </ChartCard>
 
             {/* Read Latency */}
-            <ChartCard title="Read Latency">
+            <ChartCard title="Read Latency (per query)">
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={timeseries} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid {...chartGridProps} />

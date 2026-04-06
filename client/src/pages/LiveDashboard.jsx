@@ -547,7 +547,7 @@ export default function LiveDashboard() {
       {/* ============================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Write Latency */}
-        <ChartCard title="Write Latency">
+        <ChartCard title="Write Latency (per batch)">
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={visibleMetrics} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
               <CartesianGrid {...chartGridProps} />
@@ -605,7 +605,7 @@ export default function LiveDashboard() {
         </ChartCard>
 
         {/* Read Latency */}
-        <ChartCard title="Read Latency">
+        <ChartCard title="Read Latency (per query)">
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={visibleMetrics} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
               <CartesianGrid {...chartGridProps} />
