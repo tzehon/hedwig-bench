@@ -178,6 +178,11 @@ function computeSummary(timeseries, config) {
   const writeP99 = computePercentile(sustainWriteP99s, 99);
   const readP99 = computePercentile(sustainReadP99s, 99);
 
+  // Minimum p99 read latency (best 1-second window during sustain)
+  const readP99Min = sustainReadP99s.length > 0
+    ? Math.min(...sustainReadP99s.filter((v) => v > 0))
+    : 0;
+
   const totalOps = totalWriteOps + totalReadOps;
   const totalErrors = totalWriteErrors + totalReadErrors;
   const errorRate = totalOps > 0 ? (totalErrors / totalOps) * 100 : 0;
@@ -210,6 +215,7 @@ function computeSummary(timeseries, config) {
     avgReadRPS: Math.round(avgReadRPS * 100) / 100,
     writeP99: Math.round(writeP99 * 100) / 100,
     readP99: Math.round(readP99 * 100) / 100,
+    readP99Min: Math.round((readP99Min || 0) * 100) / 100,
     totalWriteOps,
     totalReadOps,
     totalWriteErrors,

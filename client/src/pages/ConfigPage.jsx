@@ -262,7 +262,8 @@ export default function ConfigPage() {
   const [gapSeconds, setGapSeconds] = useState(30);
 
   // -- Actions --
-  const [dropCollection, setDropCollection] = useState(false);
+  // 'none' | 'deleteData' | 'dropCollection'
+  const [dropMode, setDropMode] = useState('none');
   const [submitting, setSubmitting] = useState(false);
 
   // -- Cleanup --
@@ -310,14 +311,15 @@ export default function ConfigPage() {
       rampSeconds,
       sustainSeconds,
       gapSeconds,
-      dropCollection,
+      dropCollection: dropMode === 'dropCollection',
+      deleteData: dropMode === 'deleteData',
       ...overrides,
     }),
     [
       mongoUri, dbName, collectionName, poolSize, docSize, userPoolSize,
       indexProfile, writeMode, batchSize, targetWriteRPS, writeConcern, uncapped,
       targetReadRPS, numSpikes, rampSeconds, sustainSeconds, gapSeconds,
-      dropCollection,
+      dropMode,
     ],
   );
 
@@ -337,10 +339,9 @@ export default function ConfigPage() {
       if (!proceed) return;
 
       if (config.dropCollection) {
-        const dropOk = window.confirm(
-          `This will DROP the '${config.collectionName}' collection. All data will be lost. Continue?`,
-        );
-        if (!dropOk) return;
+        if (!window.confirm(`This will DROP the '${config.collectionName}' collection (data + indexes). Continue?`)) return;
+      } else if (config.deleteData) {
+        if (!window.confirm(`This will DELETE all documents from '${config.collectionName}' but keep indexes. Continue?`)) return;
       }
 
       try {
@@ -700,15 +701,36 @@ export default function ConfigPage() {
       {/* Actions                                                          */}
       {/* ---------------------------------------------------------------- */}
       <Section title="Actions">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={dropCollection}
-            onChange={(e) => setDropCollection(e.target.checked)}
-            className="accent-indigo-500 w-4 h-4"
-          />
-          <span className="text-sm text-gray-300">Drop collection before run</span>
-        </label>
+        <div className="space-y-2">
+          <span className="text-sm text-gray-400">Before run</span>
+          {[
+            { value: 'none', label: 'Keep existing data', desc: 'Benchmark against existing documents' },
+            { value: 'deleteData', label: 'Delete data, keep indexes', desc: 'Removes all documents but preserves indexes' },
+            { value: 'dropCollection', label: 'Drop collection', desc: 'Removes everything (data + indexes), recreates indexes' },
+          ].map((opt) => (
+            <label
+              key={opt.value}
+              className={`flex items-start gap-3 p-2.5 rounded-md cursor-pointer border transition-colors ${
+                dropMode === opt.value
+                  ? 'border-indigo-500 bg-indigo-500/10'
+                  : 'border-gray-700 bg-gray-900 hover:border-gray-600'
+              }`}
+            >
+              <input
+                type="radio"
+                name="dropMode"
+                value={opt.value}
+                checked={dropMode === opt.value}
+                onChange={(e) => setDropMode(e.target.value)}
+                className="mt-0.5 accent-indigo-500"
+              />
+              <div>
+                <div className="text-sm text-white">{opt.label}</div>
+                <div className="text-xs text-gray-500">{opt.desc}</div>
+              </div>
+            </label>
+          ))}
+        </div>
 
         <div className="flex items-center gap-3 pt-2">
           <button

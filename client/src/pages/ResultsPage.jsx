@@ -460,6 +460,14 @@ export default function ResultsPage() {
                 {fmt(summary.readP99)} ms
               </span>
             </div>
+            {summary.readP99Min > 0 && (
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-400">p99 Min (best)</span>
+                <span className="text-sm font-mono font-semibold text-green-400">
+                  {fmt(summary.readP99Min)} ms
+                </span>
+              </div>
+            )}
           </div>
         </SummaryCard>
 

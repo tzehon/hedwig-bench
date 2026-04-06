@@ -110,13 +110,15 @@ export class RunManager {
       this._db = this._client.db(this._config.dbName);
       this._collection = this._db.collection(this._config.collectionName);
 
-      // ── 2. Optionally drop collection ──
+      // ── 2. Optionally clear data ──
       if (this._config.dropCollection) {
         try {
           await this._collection.drop();
         } catch {
           // Collection may not exist yet; that's fine
         }
+      } else if (this._config.deleteData) {
+        await this._collection.deleteMany({});
       }
 
       // ── 3. Set up indexes ──
