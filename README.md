@@ -99,6 +99,10 @@ cd hedwig-bench
 # Install all dependencies (root + server + client)
 npm run install:all
 
+# (Optional) Pre-fill your MongoDB URI so you don't have to paste it each time
+cp client/.env.example client/.env
+# Edit client/.env and set VITE_MONGO_URI=mongodb+srv://...
+
 # Start both frontend and backend in dev mode
 npm run dev
 ```
@@ -203,9 +207,9 @@ A demo page showcasing MongoDB Atlas Search capabilities — full-text search, a
 | Connection | Database name | `hedwig_bench` | — | Target database |
 | Connection | Collection name | `inbox` | — | Target collection |
 | Connection | Pool size | `200` | 1+ | MongoClient `maxPoolSize` |
-| Document | Doc size (KB) | `7` | 1–50 | Document is padded to this size |
+| Document | Doc size (KB) | `3` | 1–50 | Document is padded to this size |
 | Document | User pool size | `100,000` | 1+ | Number of unique `user_id` values |
-| Index | Profile | `ttl` | `minimal` / `ttl` / `extended` | See [Index Profiles](#index-profiles) |
+| Index | Profile | `extended` | — | Fixed: Extended (4 indexes) matching Scylla access patterns |
 | Write | Mode | `bulk` | `bulk` / `single` | `insertMany` vs `insertOne` |
 | Write | Batch size | `500` | 1+ | Docs per `insertMany` (bulk only) |
 | Write | Target peak RPS | `35,000` | 1,000–50,000 | Peak write ops/sec during sustain |
@@ -374,7 +378,7 @@ curl -X POST http://localhost:3001/api/runs \
     "poolSize": 200,
     "docSize": 7,
     "userPoolSize": 100000,
-    "indexProfile": "ttl",
+    "indexProfile": "extended",
     "writeMode": "bulk",
     "batchSize": 500,
     "targetWriteRPS": 5000,
