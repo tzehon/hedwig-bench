@@ -237,7 +237,7 @@ export default function ConfigPage() {
   const [poolSize, setPoolSize] = useState(200);
 
   // -- Document Shape --
-  const [docSize, setDocSize] = useState(7);
+  const [docSize, setDocSize] = useState(3);
   const [userPoolSize, setUserPoolSize] = useState(100000);
   const [docPreview, setDocPreview] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -256,10 +256,10 @@ export default function ConfigPage() {
   const [targetReadRPS, setTargetReadRPS] = useState(1500);
 
   // -- Spike Pattern --
-  const [numSpikes, setNumSpikes] = useState(3);
-  const [rampSeconds, setRampSeconds] = useState(120);
-  const [sustainSeconds, setSustainSeconds] = useState(180);
-  const [gapSeconds, setGapSeconds] = useState(60);
+  const [numSpikes, setNumSpikes] = useState(2);
+  const [rampSeconds, setRampSeconds] = useState(60);
+  const [sustainSeconds, setSustainSeconds] = useState(120);
+  const [gapSeconds, setGapSeconds] = useState(30);
 
   // -- Actions --
   const [dropCollection, setDropCollection] = useState(false);
@@ -361,9 +361,9 @@ export default function ConfigPage() {
     setNumSpikes(1);
     setTargetWriteRPS(5000);
     setTargetReadRPS(500);
-    setRampSeconds(30);
-    setSustainSeconds(60);
-    setGapSeconds(30);
+    setRampSeconds(10);
+    setSustainSeconds(30);
+    setGapSeconds(10);
 
     // Use a microtask so state is conceptually set before we call handleStart.
     // We pass overrides directly so the current call uses smoke-test values.
@@ -372,9 +372,9 @@ export default function ConfigPage() {
         numSpikes: 1,
         targetWriteRPS: 5000,
         targetReadRPS: 500,
-        rampSeconds: 30,
-        sustainSeconds: 60,
-        gapSeconds: 30,
+        rampSeconds: 10,
+        sustainSeconds: 30,
+        gapSeconds: 10,
       });
     }, 0);
   }, [handleStart]);

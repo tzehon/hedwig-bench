@@ -10,6 +10,7 @@ import { URL } from 'node:url';
 import { initDatabase } from './db/database.js';
 import runsRouter, { setBroadcastFunctions, getActiveRuns } from './routes/runs.js';
 import searchRouter, { disconnect as disconnectSearch } from './routes/search.js';
+import queriesRouter, { disconnect as disconnectQueries } from './routes/queries.js';
 
 const PORT = 3001;
 
@@ -33,6 +34,7 @@ app.use(express.json());
 
 app.use('/api/runs', runsRouter);
 app.use('/api/search', searchRouter);
+app.use('/api/queries', queriesRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -192,6 +194,7 @@ async function shutdown() {
 
   // Close search connection
   await disconnectSearch().catch(() => {});
+  await disconnectQueries().catch(() => {});
 
   // Close all WebSocket connections
   for (const [runId, clients] of wsClients) {

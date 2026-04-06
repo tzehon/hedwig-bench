@@ -43,6 +43,12 @@ export function cleanup({ mongoUri, dbName, collectionName, clearHistory }) {
   });
 }
 
+export async function clearAllRuns() {
+  const runs = await listRuns();
+  await Promise.all(runs.map((r) => deleteRun(r.id)));
+  return { deleted: runs.length };
+}
+
 export function createWebSocket(runId) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
