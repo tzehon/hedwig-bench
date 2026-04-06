@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from 'node:crypto';
+// Use Math.random for speed — crypto randomness not needed for benchmark data
 
 const DEFAULT_CONCURRENCY = 50;
 
@@ -21,7 +21,7 @@ const TOTAL_WEIGHT = QUERY_PATTERNS.reduce((sum, p) => sum + p.weight, 0);
 const STATUSES = ['delivered', 'read', 'unread'];
 
 function pickQueryPattern() {
-  const roll = randomInt(0, TOTAL_WEIGHT);
+  const roll = Math.floor(Math.random() * TOTAL_WEIGHT);
   let cumulative = 0;
   for (const pattern of QUERY_PATTERNS) {
     cumulative += pattern.weight;
@@ -85,7 +85,7 @@ export class ReadWorker {
         await this._rateLimiter.acquire(1);
 
         // Pick a random user
-        const num = randomInt(1, userPoolSize + 1);
+        const num = 1 + Math.floor(Math.random() * userPoolSize);
         const userId = `user_${String(num).padStart(6, '0')}`;
 
         const pattern = pickQueryPattern();
@@ -96,7 +96,12 @@ export class ReadWorker {
             // WHERE user_id = ? AND msg_id = ?
             // Use a random UUID — will usually miss (simulates cache-miss reads),
             // which is a realistic worst-case for point reads.
-            const msgId = randomUUID();
+            const h = '0123456789abcdef';
+            let msgId = '';
+            for (let i = 0; i < 36; i++) {
+              if (i === 8 || i === 13 || i === 18 || i === 23) msgId += '-';
+              else msgId += h[Math.floor(Math.random() * 16)];
+            }
             await this._collection.findOne({ user_id: userId, msg_id: msgId });
             break;
           }
@@ -113,7 +118,7 @@ export class ReadWorker {
           }
           case 'filtered_inbox': {
             // WHERE user_id = ? AND status = ? ORDER BY created_at DESC LIMIT 20
-            const status = STATUSES[randomInt(0, STATUSES.length)];
+            const status = STATUSES[Math.floor(Math.random() * STATUSES.length)];
             await this._collection
               .find({ user_id: userId, status })
               .sort({ created_at: -1 })

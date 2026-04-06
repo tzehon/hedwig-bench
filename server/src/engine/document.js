@@ -1,4 +1,4 @@
-import { randomBytes, randomInt, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 
 const SUBJECT_LINES = [
   'Your order has been shipped!',
@@ -41,7 +41,24 @@ const BODY_WORDS = [
 ];
 
 function randomHex(bytes) {
-  return randomBytes(bytes).toString('hex');
+  const chars = '0123456789abcdef';
+  let result = '';
+  for (let i = 0; i < bytes * 2; i++) {
+    result += chars[Math.floor(Math.random() * 16)];
+  }
+  return result;
+}
+
+function fastUUID() {
+  // Fast non-crypto UUID v4
+  const h = '0123456789abcdef';
+  let u = '';
+  for (let i = 0; i < 36; i++) {
+    if (i === 8 || i === 13 || i === 18 || i === 23) u += '-';
+    else if (i === 14) u += '4';
+    else u += h[Math.floor(Math.random() * 16)];
+  }
+  return u;
 }
 
 function randomUserId(userPoolSize) {
@@ -88,13 +105,15 @@ function generateBodyText(targetBytes) {
  * @param {number} userPoolSize - Size of the user ID pool (1 to userPoolSize)
  * @returns {object} A document matching the inbox message schema
  */
+// Cache skeleton overhead — it's roughly constant across docs (~250 bytes)
+let _skeletonOverhead = 0;
+
 export function generateDocument(docSizeKB = 1, userPoolSize = 100000) {
   const targetBytes = docSizeKB * 1024;
 
-  // Build the document skeleton first (without body) to estimate overhead
   const doc = {
     user_id: randomUserId(userPoolSize),
-    msg_id: randomUUID(),
+    msg_id: fastUUID(),
     campaign_id: `camp_${randomHex(3)}`,
     subject: randomSubject(),
     body: '',
@@ -107,11 +126,12 @@ export function generateDocument(docSizeKB = 1, userPoolSize = 100000) {
     },
   };
 
-  // Estimate the BSON overhead of all fields except body.
-  const skeletonSize = JSON.stringify(doc).length;
+  // Compute skeleton overhead once, reuse thereafter
+  if (_skeletonOverhead === 0) {
+    _skeletonOverhead = JSON.stringify(doc).length;
+  }
 
-  // The body needs to fill the remaining space
-  const bodyTargetBytes = Math.max(0, targetBytes - skeletonSize);
+  const bodyTargetBytes = Math.max(0, targetBytes - _skeletonOverhead);
   doc.body = generateBodyText(bodyTargetBytes);
 
   return doc;

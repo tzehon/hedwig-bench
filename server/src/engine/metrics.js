@@ -5,12 +5,15 @@
  * @param {number} p - Percentile in 0-100
  * @returns {number} The percentile value, or 0 if array is empty
  */
-export function percentile(values, p) {
-  if (values.length === 0) return 0;
-
-  const sorted = values.slice().sort((a, b) => a - b);
+export function percentile(sorted, p) {
+  if (sorted.length === 0) return 0;
   const idx = Math.ceil((p / 100) * sorted.length) - 1;
   return sorted[Math.max(0, idx)];
+}
+
+/** Sort an array in place and return it. Call once, then pass to percentile(). */
+function sortLatencies(arr) {
+  return arr.sort((a, b) => a - b);
 }
 
 /**
@@ -73,6 +76,10 @@ export class MetricsCollector {
     const writerMetrics = this._writer.drainMetrics();
     const readerMetrics = this._reader.drainMetrics();
 
+    // Sort once, then compute all percentiles from the sorted array
+    const wLat = sortLatencies(writerMetrics.latencies);
+    const rLat = sortLatencies(readerMetrics.latencies);
+
     const snapshot = {
       second: this._second,
       timestamp: new Date().toISOString(),
@@ -81,16 +88,16 @@ export class MetricsCollector {
       write: {
         ops: writerMetrics.ops,
         errors: writerMetrics.errors,
-        p50: percentile(writerMetrics.latencies, 50),
-        p95: percentile(writerMetrics.latencies, 95),
-        p99: percentile(writerMetrics.latencies, 99),
+        p50: percentile(wLat, 50),
+        p95: percentile(wLat, 95),
+        p99: percentile(wLat, 99),
       },
       read: {
         ops: readerMetrics.ops,
         errors: readerMetrics.errors,
-        p50: percentile(readerMetrics.latencies, 50),
-        p95: percentile(readerMetrics.latencies, 95),
-        p99: percentile(readerMetrics.latencies, 99),
+        p50: percentile(rLat, 50),
+        p95: percentile(rLat, 95),
+        p99: percentile(rLat, 99),
       },
       system: this._latestSystem,
     };

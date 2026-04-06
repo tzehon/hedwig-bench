@@ -11,6 +11,7 @@ export class RateLimiter {
     this.bucketSize = bucketSize ?? tokensPerSecond;
     this.tokens = this.bucketSize; // start full
     this._stopped = false;
+    this._lastRefillTime = performance.now();
 
     /** @type {Array<{ count: number, resolve: () => void, reject: (err: Error) => void, timer: ReturnType<typeof setTimeout> | null }>} */
     this._waiters = [];
@@ -19,11 +20,15 @@ export class RateLimiter {
     this._refillInterval = setInterval(() => this._refill(), 10);
   }
 
-  /** Refill tokens based on rate (called every 10ms). */
+  /** Refill tokens based on elapsed time (handles timer drift). */
   _refill() {
     if (this._stopped) return;
 
-    const tokensToAdd = this.tokensPerSecond * (10 / 1000); // 10ms worth
+    const now = performance.now();
+    const elapsedMs = now - this._lastRefillTime;
+    this._lastRefillTime = now;
+
+    const tokensToAdd = this.tokensPerSecond * (elapsedMs / 1000);
     this.tokens = Math.min(this.bucketSize, this.tokens + tokensToAdd);
 
     // Try to drain the waiter queue
@@ -91,8 +96,10 @@ export class RateLimiter {
    */
   updateRate(newTokensPerSecond) {
     this.tokensPerSecond = newTokensPerSecond;
-    // Also update bucket size to match, so burst capacity tracks the rate
-    this.bucketSize = Math.max(this.bucketSize, newTokensPerSecond);
+    // Keep bucket size proportional to current rate (2x for small burst tolerance)
+    this.bucketSize = Math.max(newTokensPerSecond * 2, 1000);
+    // Cap current tokens to new bucket size
+    this.tokens = Math.min(this.tokens, this.bucketSize);
   }
 
   /**
