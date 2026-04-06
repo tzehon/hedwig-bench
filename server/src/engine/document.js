@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 
 const SUBJECT_LINES = [
   'Your order has been shipped!',
