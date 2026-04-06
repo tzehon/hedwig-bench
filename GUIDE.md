@@ -1,6 +1,6 @@
 # Hedwig Bench — Getting Started Guide
 
-A step-by-step walkthrough for running the benchmark and Atlas Search demo.
+A step-by-step walkthrough for running the benchmark, Query Demo, and Atlas Search.
 
 ---
 
@@ -8,9 +8,8 @@ A step-by-step walkthrough for running the benchmark and Atlas Search demo.
 
 1. **Node.js 18+** installed
 2. **MongoDB Atlas cluster** with your IP whitelisted in Network Access
-   - M0 (free tier) works for smoke tests
-   - M10+ for real benchmarks and Atlas Search
-   - M50+ for full 35k RPS load tests
+   - M10+ for benchmarks and Atlas Search
+   - M80 NVMe recommended for full 35k RPS load tests
 3. Your Atlas connection string (e.g. `mongodb+srv://user:pass@cluster.mongodb.net`)
 
 ---
@@ -20,6 +19,11 @@ A step-by-step walkthrough for running the benchmark and Atlas Search demo.
 ```bash
 cd hedwig-bench
 npm run install:all
+
+# (Optional) Pre-fill your MongoDB URI
+cp client/.env.example client/.env
+# Edit client/.env and set VITE_MONGO_URI=mongodb+srv://...
+
 npm run dev
 ```
 
@@ -31,25 +35,25 @@ Open the frontend in your browser.
 
 ---
 
-## 2. Smoke Test (~ 2.5 minutes)
+## 2. Smoke Test (~1.5 minutes)
 
 This verifies connectivity and gives you a quick feel for the tool.
 
-1. Paste your Atlas URI in the **Connection** section
+1. Paste your Atlas URI in the **Connection** section (or it's pre-filled from `.env`)
 2. Click **Quick Smoke Test**
 3. Confirm the dialog
 4. You land on the **Live Dashboard** — watch the charts update in real time
-5. After ~2.5 minutes the run completes and you're taken to **Results**
+5. After ~100 seconds the run completes and you're taken to **Results**
 
 What to check:
 - Did the green "Actual" line track the dashed "Target" line?
-- What's the p99 write latency?
+- What's the p99 write latency (per document)?
 - Any errors in the bottom bar?
 - Did it PASS or FAIL?
 
 ---
 
-## 3. Full Benchmark (~ 20 minutes)
+## 3. Full Benchmark (~8.5 minutes)
 
 Go back to the home page (`/`). Your URI is still saved.
 
@@ -57,30 +61,36 @@ Go back to the home page (`/`). Your URI is still saved.
 
 | Setting | Value | Why |
 |---------|-------|-----|
-| Doc size | 7 KB | Matches Scylla row size (5–9 KB) |
-| Index profile | TTL (3 indexes) | Includes 60-day TTL auto-cleanup |
+| Doc size | 3 KB | Default |
 | Write mode | Bulk | Simulates campaign blast inserts |
 | Batch size | 500 | Good balance of throughput vs latency |
 | Target write RPS | 35,000 | Hedwig peak write rate |
 | Write concern | w:majority | Fixed — matches production durability |
 | Target read RPS | 1,500 | Hedwig steady-state read rate |
-| Spikes | 3 | Simulates multiple campaign blasts |
-| Ramp | 120s | Gradual ramp to peak |
-| Sustain | 180s | 3 minutes at peak per spike |
-| Gap | 60s | 1 minute between spikes (reads continue) |
+| Spikes | 2 | Simulates multiple campaign blasts |
+| Ramp | 60s | Gradual ramp to peak |
+| Sustain | 120s | 2 minutes at peak per spike |
+| Gap | 30s | Between spikes (reads continue) |
+| Uncapped mode | Off | Rate-limited to test at target RPS |
 
 ### First full run
 
-1. Check **Drop collection before run** (start clean)
+1. Select **Drop collection** under "Before run" (start clean)
 2. Click **Start Benchmark**, confirm
-3. Watch the Live Dashboard for ~20 minutes
+3. Watch the Live Dashboard for ~8.5 minutes
 4. Review results when complete
 
 ### Second run (with existing data)
 
-1. **Uncheck** Drop collection — data from the first run stays
+1. Select **Keep existing data** — data from the first run stays
 2. Run again with the same or different settings
 3. This is more realistic: reads now query against millions of existing documents
+
+### Finding max throughput
+
+1. Check **Uncapped mode** in Write Configuration
+2. Set 1 spike, 10s ramp, 30s sustain
+3. Start — this removes the write rate limiter and shows the cluster's actual ceiling
 
 ---
 
@@ -94,60 +104,68 @@ After 2+ runs, go to **Run History** (`/history`).
    - **Overlay charts** — throughput and latency lines from each run on the same axes
    - **Side-by-side table** — config and performance differences highlighted
 
-### Useful comparisons
-
-| Run A | Run B | What you learn |
-|-------|-------|----------------|
-| Bulk inserts | Single inserts | Throughput difference for batch vs one-at-a-time |
-| 5 KB docs | 9 KB docs | Impact of document size on write throughput |
-| TTL indexes (3) | Extended indexes (4) | Write overhead of the extra status filter index |
-| Empty collection | 10M+ documents | How performance changes with data volume |
+Use **Clear History** to delete all runs.
 
 ---
 
-## 5. Atlas Search Demo
+## 5. Query Demo
 
-This tab showcases full-text search capabilities that ScyllaDB doesn't have. It's a demo, not a benchmark.
+The **Query Demo** tab (`/queries`) lets you run the 3 Scylla-equivalent query patterns interactively and see results, execution stats, and which index was used.
+
+### Setup
+
+1. Go to the **Query Demo** tab
+2. Enter the same Atlas URI, database, and collection name
+3. Click **Connect**
+4. Sample IDs are auto-fetched from the collection
+
+> Note: Run a benchmark first so there's data in the collection to query.
+
+### Query patterns
+
+| Query | What it does | Scylla equivalent |
+|-------|-------------|-------------------|
+| **Point Read** | Fetch a single message by user + msg_id | `WHERE pk = ? AND msg_id = ?` |
+| **Recent Messages** | Fetch user's recent inbox (last 24h) | `WHERE pk = ? AND created_at > ? LIMIT ?` |
+| **Filtered Inbox** | Fetch user's messages by status | `WHERE pk = ? AND status = ? ORDER BY created_at DESC LIMIT ? ALLOW FILTERING` |
+
+For each query, the results show:
+- The executed MongoDB query
+- Returned documents
+- **Server-side execution time** (from explain)
+- **Index used** (green) or "Collection Scan" (red)
+- Documents and keys examined
+- Scylla CQL comparison
+
+---
+
+## 6. Atlas Search Demo
+
+The **Atlas Search** tab (`/search`) showcases full-text search, autocomplete, and faceted filtering — capabilities that ScyllaDB doesn't have.
 
 ### Setup
 
 1. Go to the **Atlas Search** tab
 2. Enter the same Atlas URI, database, and collection name
 3. Click **Connect**
-4. Click **Create Search Index** — this builds asynchronously on Atlas (1–2 minutes)
+4. Click **Create Search Index** — builds asynchronously (1–2 minutes)
 5. Refresh until the status shows **Index Ready**
 
-> Note: Atlas Search requires M10+ clusters. It won't work on the free tier (M0).
+> Note: Atlas Search requires M10+ clusters. Not available on free tier (M0).
 
 ### What to demo
 
-**Suggested searches** — click any card on the page:
-
-| Query | What it shows |
-|-------|---------------|
-| "order shipped" | Full-text phrase matching across subject field |
-| "security update" | Multi-word relevance search |
-| "rewadr" (typo) | Fuzzy matching — still finds "reward" |
-| "subscription expiring" | Cross-field relevance ranking |
-| "welcome" | Simple single-word search |
-
-**Autocomplete** — start typing in the search bar (3+ characters). Suggestions drop down in real time, powered by edge n-gram tokenization on the `subject` field.
-
-**Filters** — combine text search with structured filters in a single query:
-- Status: filter by `delivered`, `read`, or `unread`
-- User ID: search within a specific user's inbox (e.g. `user_000042`)
-- Date range: restrict results to a time window
-
-**What to highlight to stakeholders:**
-- "This is a single query — text search + filters + sorting by relevance, all in one."
-- "ScyllaDB can't do this without adding Elasticsearch or Solr as a separate system."
-- "Autocomplete, fuzzy matching, and highlighting are built into Atlas — no extra infra."
+| Feature | How to show it |
+|---------|---------------|
+| Full-text search | Click "order shipped" or "security update" suggested cards |
+| Fuzzy matching | Click "rewadr" (typo) — still finds "reward" |
+| Autocomplete | Type 3+ characters in the search bar, watch dropdown |
+| Faceted filtering | Combine text search with status/user/date filters |
+| Relevance scoring | Results ranked by score, highlighted terms |
 
 ---
 
-## 6. Cleanup
-
-When you're done, clean up the benchmark data.
+## 7. Cleanup
 
 ### Option A: In-app cleanup
 
@@ -155,51 +173,30 @@ When you're done, clean up the benchmark data.
 2. Scroll down and expand the **Cleanup** section
 3. Check or uncheck "Also clear local run history"
 4. Click **Cleanup**, confirm
-5. This drops the collection, removes the search index, and optionally clears local run history
 
 ### Option B: Delete the Atlas cluster
 
-If you created a dedicated cluster for benchmarking, just terminate it in the Atlas UI — cleanest option.
-
-### Option C: Manual cleanup
-
-```bash
-# Drop collection via mongosh
-mongosh "your-atlas-uri" --eval '
-  use hedwig_bench;
-  db.inbox.drop();
-'
-
-# Delete local run history
-rm server/data/hedwig-bench.db
-```
+If you created a dedicated cluster for benchmarking, just terminate it in the Atlas UI.
 
 ---
 
 ## Running on EC2 for Full Load
 
-Your laptop likely can't push 35k ops/sec with `w:majority` over the internet. For that, run from an EC2 instance in the same AWS region as your Atlas cluster.
+For 35k+ RPS tests, run from an EC2 instance in the same AWS region as your Atlas cluster.
 
 ```bash
-# Spin up a c5.2xlarge in ap-southeast-1
-# SSH in, then:
-
-# Install Node.js
-curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
-sudo yum install -y nodejs    # Amazon Linux
-# or: sudo apt-get install -y nodejs    # Ubuntu
-
-# Set up the project
-git clone <repo-url> hedwig-bench
-cd hedwig-bench
+# On a c5.2xlarge in ap-southeast-1
+sudo yum install -y nodejs git    # or apt-get on Ubuntu
+git clone <repo-url> hedwig-bench && cd hedwig-bench
 npm run install:all
-npm run build
-npm start
+
+# Set your MongoDB URI
+echo 'VITE_MONGO_URI=mongodb+srv://...' > client/.env
+
+npm run build && npm start
 ```
 
-Access at `http://<ec2-public-ip>:3001` (open port 3001 in the security group).
-
-With <2ms latency to Atlas in the same region, you should be able to hit the full 35k RPS target.
+Access at `http://<ec2-public-ip>:3001` (open port 3001 in security group).
 
 ---
 
@@ -208,11 +205,14 @@ With <2ms latency to Atlas in the same region, you should be able to hit the ful
 | Action | How |
 |--------|-----|
 | Start the app | `npm run dev` |
+| Pre-fill URI | Set `VITE_MONGO_URI` in `client/.env` |
 | Run a smoke test | Home page → Quick Smoke Test |
 | Run a full benchmark | Home page → adjust settings → Start Benchmark |
+| Find max throughput | Check Uncapped mode → Start |
 | Watch live progress | Auto-redirects to Live Dashboard |
-| View results | Auto-redirects after run completes, or `/results/:id` |
+| View results | Auto-redirects after run completes |
 | Compare runs | History page → check 2–4 runs → Compare Selected |
+| Demo queries | Query Demo tab → Connect → run queries |
 | Demo Atlas Search | Atlas Search tab → Connect → Create Index → search |
-| Clean up | Home page → Cleanup section, or delete the Atlas cluster |
+| Clean up | Home page → Cleanup section |
 | Stop the app | `Ctrl+C` in the terminal |
