@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from 'node:crypto';
 
-const DEFAULT_CONCURRENCY = 20;
+const DEFAULT_CONCURRENCY = 50;
 
 /**
  * Query patterns modelled after Scylla access patterns:
