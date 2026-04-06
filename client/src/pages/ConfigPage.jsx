@@ -229,6 +229,9 @@ function formatDuration(totalSeconds) {
 export default function ConfigPage() {
   const navigate = useNavigate();
 
+  // -- Run Name --
+  const [runName, setRunName] = useState('');
+
   // -- Connection --
   const [mongoUri, setMongoUri] = useState(import.meta.env.VITE_MONGO_URI || '');
   const [uriVisible, setUriVisible] = useState(false);
@@ -294,6 +297,7 @@ export default function ConfigPage() {
   // -- Build config object --
   const buildConfig = useCallback(
     (overrides = {}) => ({
+      runName: runName || undefined,
       mongoUri,
       dbName,
       collectionName,
@@ -316,7 +320,7 @@ export default function ConfigPage() {
       ...overrides,
     }),
     [
-      mongoUri, dbName, collectionName, poolSize, docSize, userPoolSize,
+      runName, mongoUri, dbName, collectionName, poolSize, docSize, userPoolSize,
       indexProfile, writeMode, batchSize, targetWriteRPS, writeConcern, uncapped,
       targetReadRPS, numSpikes, rampSeconds, sustainSeconds, gapSeconds,
       dropMode,
@@ -411,6 +415,16 @@ export default function ConfigPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <h1 className="text-xl font-bold text-white mb-2">Configure &amp; Run</h1>
+
+      <div>
+        <Label htmlFor="runName">Run name (optional)</Label>
+        <TextInput
+          id="runName"
+          value={runName}
+          onChange={(e) => setRunName(e.target.value)}
+          placeholder="e.g. M80 NVMe - 35k baseline"
+        />
+      </div>
 
       {/* ---------------------------------------------------------------- */}
       {/* Connection                                                       */}

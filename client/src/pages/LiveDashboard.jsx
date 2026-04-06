@@ -397,8 +397,8 @@ export default function LiveDashboard() {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-4">
             <div>
-              <span className="text-xs text-gray-400">Run ID</span>
-              <p className="text-sm font-mono text-gray-100">{truncateId(id)}</p>
+              <span className="text-xs text-gray-400">{runConfig?.runName ? 'Run' : 'Run ID'}</span>
+              <p className="text-sm text-gray-100">{runConfig?.runName || <span className="font-mono">{truncateId(id)}</span>}</p>
             </div>
             <div>
               <span className="text-xs text-gray-400">Elapsed</span>

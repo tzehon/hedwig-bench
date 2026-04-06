@@ -46,32 +46,16 @@ Simulates the bursty campaign-blast write pattern of the Hedwig inbox messaging 
 ## Architecture
 
 ```
-+-------------------------+         +-----------------------------+
-|  React Frontend         |         |  Express + WebSocket        |
-|  (Vite, Tailwind,       | <--WS-->|  Backend Server             |
-|   Recharts)             |         |                             |
-|                         |         |  +------------------------+ |
-|  Pages:                 |         |  | Load Engine             | |
-|  - Configure & Run      |         |  | - Document Gen          | |
-|  - Live Dashboard       |         |  | - Spike Scheduler       | |
-|  - Results              |         |  | - Write Worker          | |
-|  - History & Compare    |         |  | - Read Worker           | |
-|  - Atlas Search         |         |  | - Rate Limiter          | |
-|                         |         |  | - Metrics               | |
-+-------------------------+         |  +-----------+------------+ |
-                                    |              |              |
-                                    |  +-----------+------------+ |
-                                    |  | SQLite (runs DB)        | |
-                                    |  +------------------------+ |
-                                    +-------------+---------------+
-                                                  |
-                                                  | mongodb driver
-                                                  v
-                                    +-----------------------------+
-                                    |  MongoDB Atlas              |
-                                    |  (target cluster)           |
-                                    +-----------------------------+
+React Frontend  <--- WebSocket --->  Express Backend  --- mongodb --->  Atlas Cluster
+(Vite, Tailwind,                     (Load Engine,
+ Recharts)                            SQLite, WS)
 ```
+
+**Frontend pages:** Configure & Run, Live Dashboard, Results, History & Compare, Atlas Search, Query Demo
+
+**Backend engine:** Document Gen, Spike Scheduler, Write Worker (50 lanes), Read Worker (50 lanes), Token-Bucket Rate Limiter, Metrics Collector
+
+**Data flow:** Frontend configures a run via REST API. Backend drives the load engine, streams per-second metrics over WebSocket to the live dashboard, and persists results to SQLite.
 
 - **Frontend**: React 18 (Vite), Tailwind CSS, Recharts for live charts.
 - **Backend**: Express.js, `ws` for real-time metrics streaming, official MongoDB Node.js driver (`mongodb` v6).
@@ -82,7 +66,7 @@ Simulates the bursty campaign-blast write pattern of the Hedwig inbox messaging 
 
 ## Prerequisites
 
-- **Node.js** >= 18 (uses ES modules, `performance.now()`, `crypto.randomBytes`)
+- **Node.js** >= 18 (uses ES modules, `performance.now()`)
 - **npm** >= 9
 - **MongoDB Atlas cluster** (or any MongoDB 5.0+ instance) — free tier (M0) works for smoke tests; M10+ recommended for real benchmarks; M50+ for full 35k RPS load tests
 - **Atlas Search**: For the search showcase tab, the cluster must support Atlas Search (M10+ or dedicated; not available on M0 free tier)
@@ -484,7 +468,7 @@ The load generation engine lives in `server/src/engine/` and consists of these c
 
 | Component | File | Description |
 |-----------|------|-------------|
-| **Document Generator** | `document.js` | Generates inbox documents with exact KB sizing. Uses `crypto.randomBytes` for IDs, `crypto.randomUUID` for msg_id, and a pool of 20 subject line templates. Includes nested `metadata` subdocument. |
+| **Document Generator** | `document.js` | Generates inbox documents with exact KB sizing. Uses pre-built padding block and `Math.random` for fast ID generation. Includes nested `metadata` subdocument. |
 | **Index Setup** | `indexes.js` | Creates indexes based on the selected profile, modelled after Scylla access patterns. Uses `createIndexes` for idempotent batch creation. |
 | **Rate Limiter** | `rateLimiter.js` | Token-bucket implementation with 10ms refill interval for smooth pacing. Supports dynamic rate updates (called every second by the spike scheduler). Async `acquire()` with a FIFO waiter queue. |
 | **Spike Scheduler** | `spike.js` | Pre-computes the entire run schedule as an array of `{ second, targetWriteRPS }` entries. Also used client-side for the spike pattern preview SVG. |

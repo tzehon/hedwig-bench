@@ -375,7 +375,7 @@ export default function ResultsPage() {
           Back to History
         </Link>
         <span className="text-gray-600">|</span>
-        <span className="text-sm text-gray-500 font-mono">{truncateId(id)}</span>
+        <span className="text-sm text-gray-300">{config.runName || <span className="font-mono text-gray-500">{truncateId(id)}</span>}</span>
         <span
           className={`text-xs font-medium px-2 py-0.5 rounded-full ${
             run?.status === 'completed'

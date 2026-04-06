@@ -26,6 +26,11 @@ function truncateId(id) {
   return id.length > 12 ? id.slice(0, 12) + '...' : id;
 }
 
+function runLabel(run) {
+  const name = run?.config?.runName;
+  return name || truncateId(run?.id || run?._id);
+}
+
 function fmt(v, digits = 1) {
   if (v == null) return '--';
   return typeof v === 'number'
@@ -472,7 +477,7 @@ export default function HistoryPage() {
                 <th className="px-4 py-3 w-10">
                   <span className="sr-only">Select</span>
                 </th>
-                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Run ID</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Name</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Doc Size</th>
@@ -510,13 +515,13 @@ export default function HistoryPage() {
                       />
                     </td>
 
-                    {/* Run ID */}
+                    {/* Name */}
                     <td className="px-4 py-3">
                       <Link
                         to={`/results/${id}`}
-                        className="text-emerald-400 hover:text-emerald-300 font-mono text-xs transition-colors"
+                        className="text-emerald-400 hover:text-emerald-300 text-sm transition-colors"
                       >
-                        {truncateId(id)}
+                        {config.runName || <span className="font-mono text-xs">{truncateId(id)}</span>}
                       </Link>
                     </td>
 
@@ -616,7 +621,7 @@ export default function HistoryPage() {
                     className="w-2 h-2 rounded-full inline-block"
                     style={{ backgroundColor: COMPARE_PALETTE[i] }}
                   />
-                  {truncateId(run.id || run._id)}
+                  {runLabel(run)}
                 </span>
               ))}
             </div>
@@ -641,7 +646,7 @@ export default function HistoryPage() {
                       key={`write_tp_${i}`}
                       type="monotone"
                       dataKey={`actualWriteRPS_${i}`}
-                      name={truncateId(run.id || run._id)}
+                      name={runLabel(run)}
                       stroke={COMPARE_PALETTE[i]}
                       dot={false}
                       strokeWidth={2}
@@ -670,7 +675,7 @@ export default function HistoryPage() {
                       key={`read_tp_${i}`}
                       type="monotone"
                       dataKey={`actualReadRPS_${i}`}
-                      name={truncateId(run.id || run._id)}
+                      name={runLabel(run)}
                       stroke={COMPARE_PALETTE[i]}
                       dot={false}
                       strokeWidth={2}
@@ -712,7 +717,7 @@ export default function HistoryPage() {
                       key={`write_lat_${i}`}
                       type="monotone"
                       dataKey={`writeP99_${i}`}
-                      name={truncateId(run.id || run._id)}
+                      name={runLabel(run)}
                       stroke={COMPARE_PALETTE[i]}
                       dot={false}
                       strokeWidth={2}
@@ -754,7 +759,7 @@ export default function HistoryPage() {
                       key={`read_lat_${i}`}
                       type="monotone"
                       dataKey={`readP99_${i}`}
-                      name={truncateId(run.id || run._id)}
+                      name={runLabel(run)}
                       stroke={COMPARE_PALETTE[i]}
                       dot={false}
                       strokeWidth={2}
@@ -790,7 +795,7 @@ export default function HistoryPage() {
                             className="w-2 h-2 rounded-full inline-block"
                             style={{ backgroundColor: COMPARE_PALETTE[i] }}
                           />
-                          {truncateId(run.id || run._id)}
+                          {runLabel(run)}
                         </span>
                       </th>
                     ))}
