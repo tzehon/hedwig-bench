@@ -345,30 +345,27 @@ router.post('/autocomplete', async (req, res) => {
           },
         },
       },
+      { $limit: 50 },
       {
         $project: {
           subject: 1,
           score: { $meta: 'searchScore' },
         },
       },
-      {
-        $group: {
-          _id: '$subject',
-          score: { $max: '$score' },
-        },
-      },
-      { $sort: { score: -1 } },
-      { $limit: 5 },
-      {
-        $project: {
-          _id: 0,
-          subject: '$_id',
-          score: 1,
-        },
-      },
     ];
 
-    const suggestions = await collection.aggregate(pipeline).toArray();
+    const raw = await collection.aggregate(pipeline).toArray();
+
+    // Deduplicate by subject client-side
+    const seen = new Set();
+    const suggestions = [];
+    for (const doc of raw) {
+      if (!seen.has(doc.subject)) {
+        seen.add(doc.subject);
+        suggestions.push(doc);
+        if (suggestions.length >= 5) break;
+      }
+    }
 
     res.json({ suggestions });
   } catch (err) {
