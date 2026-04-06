@@ -24,18 +24,6 @@ const QUERY_TYPES = [
     description: "Fetch user's messages by status",
     icon: '\u29E6',
   },
-  {
-    id: 'count_by_status',
-    label: 'Count by Status',
-    description: 'Aggregate: count messages per status for a user',
-    icon: '\u03A3',
-  },
-  {
-    id: 'campaign_stats',
-    label: 'Campaign Stats',
-    description: 'Aggregate: delivery stats for a campaign',
-    icon: '\u2261',
-  },
 ];
 
 const SCYLLA_COMPARISONS = {
@@ -50,14 +38,6 @@ const SCYLLA_COMPARISONS = {
   filtered_inbox: {
     query: 'SELECT * FROM inbox WHERE pk = ? AND status = ? ORDER BY created_at DESC LIMIT ? ALLOW FILTERING',
     note: 'MongoDB can use compound index {user_id:1, status:1, created_at:-1} to avoid the collection scan that Scylla\'s ALLOW FILTERING implies.',
-  },
-  count_by_status: {
-    query: null,
-    note: 'Not efficient in Scylla without a pre-computed counter table. MongoDB\'s aggregation pipeline handles this natively.',
-  },
-  campaign_stats: {
-    query: null,
-    note: 'Would require a separate materialized view in Scylla. MongoDB handles this with a simple aggregation.',
   },
 };
 
@@ -339,12 +319,6 @@ export default function QueryPage() {
         params.status = queryParams.status;
         params.limit = parseInt(queryParams.limit, 10) || 20;
         break;
-      case 'count_by_status':
-        params.userId = queryParams.userId;
-        break;
-      case 'campaign_stats':
-        params.campaignId = queryParams.campaignId;
-        break;
     }
 
     const start = performance.now();
@@ -496,8 +470,8 @@ export default function QueryPage() {
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-gray-200 mb-3">Parameters</h3>
             <div className="flex flex-wrap items-end gap-3">
-              {/* user_id — shown for point_read, recent_messages, filtered_inbox, count_by_status */}
-              {['point_read', 'recent_messages', 'filtered_inbox', 'count_by_status'].includes(selectedType) && (
+              {/* user_id — shown for point_read, recent_messages, filtered_inbox */}
+              {['point_read', 'recent_messages', 'filtered_inbox'].includes(selectedType) && (
                 <div className="min-w-[200px]">
                   <label className="block text-xs font-medium text-gray-400 mb-1">user_id</label>
                   <div className="flex gap-1">
@@ -585,32 +559,6 @@ export default function QueryPage() {
                     onChange={(e) => setQueryParams((p) => ({ ...p, limit: e.target.value }))}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
                   />
-                </div>
-              )}
-
-              {/* campaign_id — campaign_stats only */}
-              {selectedType === 'campaign_stats' && (
-                <div className="min-w-[200px]">
-                  <label className="block text-xs font-medium text-gray-400 mb-1">campaign_id</label>
-                  <div className="flex gap-1">
-                    <select
-                      value={queryParams.campaignId}
-                      onChange={(e) => setQueryParams((p) => ({ ...p, campaignId: e.target.value }))}
-                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="">Select...</option>
-                      {sampleCampaignIds.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={randomizeCampaignId}
-                      title="Random campaign_id"
-                      className="px-2 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-indigo-300 hover:border-indigo-500/50 transition-colors"
-                    >
-                      <DiceIcon />
-                    </button>
-                  </div>
                 </div>
               )}
 

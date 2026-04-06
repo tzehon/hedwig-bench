@@ -77,7 +77,8 @@ export class MetricsCollector {
     const readerMetrics = this._reader.drainMetrics();
 
     // Sort once, then compute all percentiles from the sorted array
-    const wLat = sortLatencies(writerMetrics.latencies);
+    const wLat = sortLatencies(writerMetrics.latencies);       // per-doc
+    const wBatch = sortLatencies(writerMetrics.batchLatencies); // per-batch
     const rLat = sortLatencies(readerMetrics.latencies);
 
     const snapshot = {
@@ -91,6 +92,9 @@ export class MetricsCollector {
         p50: percentile(wLat, 50),
         p95: percentile(wLat, 95),
         p99: percentile(wLat, 99),
+        batchP50: percentile(wBatch, 50),
+        batchP95: percentile(wBatch, 95),
+        batchP99: percentile(wBatch, 99),
       },
       read: {
         ops: readerMetrics.ops,

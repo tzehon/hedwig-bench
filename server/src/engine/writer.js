@@ -31,8 +31,10 @@ export class WriteWorker {
     // Metrics accumulators (drained by MetricsCollector)
     this.opsCount = 0;
     this.errorsCount = 0;
-    /** @type {number[]} */
+    /** @type {number[]} Per-doc latencies (batch time / batch size for bulk) */
     this.latencies = [];
+    /** @type {number[]} Per-batch latencies (raw insertMany/insertOne time) */
+    this.batchLatencies = [];
 
     this._writeConcern = config.writeConcern === 'majority'
       ? { w: 'majority' }
@@ -71,8 +73,10 @@ export class WriteWorker {
             writeConcern: this._writeConcern,
           });
           const elapsed = performance.now() - start;
+          const perDoc = elapsed / batchSize;
           this.opsCount += batchSize;
-          this.latencies.push(elapsed);
+          this.batchLatencies.push(elapsed);
+          this.latencies.push(perDoc);
         } else {
           if (!this._uncapped) await this._rateLimiter.acquire(1);
           const doc = generateDocument(docSizeKB, userPoolSize);
@@ -82,6 +86,7 @@ export class WriteWorker {
           });
           const elapsed = performance.now() - start;
           this.opsCount += 1;
+          this.batchLatencies.push(elapsed);
           this.latencies.push(elapsed);
         }
       } catch (err) {
@@ -102,10 +107,12 @@ export class WriteWorker {
     const ops = this.opsCount;
     const errors = this.errorsCount;
     const latencies = this.latencies;
+    const batchLatencies = this.batchLatencies;
     this.opsCount = 0;
     this.errorsCount = 0;
     this.latencies = [];
-    return { ops, errors, latencies };
+    this.batchLatencies = [];
+    return { ops, errors, latencies, batchLatencies };
   }
 
   /**
