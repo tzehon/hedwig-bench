@@ -82,8 +82,6 @@ export class ReadWorker {
 
     while (!this._stopped) {
       try {
-        // Start timer BEFORE acquire to capture coordinated omission
-        const queueStart = performance.now();
         await this._rateLimiter.acquire(1);
 
         // Pick a random user
@@ -130,7 +128,7 @@ export class ReadWorker {
           }
         }
 
-        const elapsed = performance.now() - queueStart; // includes queue wait
+        const elapsed = performance.now() - start;
         this.opsCount += 1;
         this.latencies.push(elapsed);
       } catch (err) {
