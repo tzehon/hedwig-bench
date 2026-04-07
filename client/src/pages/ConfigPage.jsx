@@ -254,6 +254,7 @@ export default function ConfigPage() {
   const [targetWriteRPS, setTargetWriteRPS] = useState(35000);
   const [writeConcern, setWriteConcern] = useState('w:majority');
   const [uncapped, setUncapped] = useState(false);
+  const [writeLanes, setWriteLanes] = useState(50);
 
   // -- Read Config --
   const [targetReadRPS, setTargetReadRPS] = useState(1500);
@@ -310,6 +311,7 @@ export default function ConfigPage() {
       targetWriteRPS,
       writeConcern,
       uncapped,
+      writeConcurrency: writeLanes,
       targetReadRPS,
       numSpikes,
       rampSeconds,
@@ -321,7 +323,7 @@ export default function ConfigPage() {
     }),
     [
       runName, mongoUri, dbName, collectionName, poolSize, docSize, userPoolSize,
-      indexProfile, writeMode, batchSize, targetWriteRPS, writeConcern, uncapped,
+      indexProfile, writeMode, batchSize, targetWriteRPS, writeConcern, uncapped, writeLanes,
       targetReadRPS, numSpikes, rampSeconds, sustainSeconds, gapSeconds,
       dropMode,
     ],
@@ -593,6 +595,18 @@ export default function ConfigPage() {
           <span className="text-sm text-gray-300">Uncapped mode</span>
           <span className="text-xs text-gray-500">(no rate limiter — find max throughput)</span>
         </label>
+
+        <div className="w-1/2">
+          <Label htmlFor="writeLanes">Write concurrency (lanes)</Label>
+          <TextInput
+            id="writeLanes"
+            type="number"
+            value={writeLanes}
+            onChange={(e) => setWriteLanes(Number(e.target.value))}
+            min={1}
+            max={500}
+          />
+        </div>
       </Section>
 
       {/* ---------------------------------------------------------------- */}
