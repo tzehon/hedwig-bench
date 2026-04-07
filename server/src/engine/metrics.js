@@ -7,8 +7,9 @@
  */
 export function percentile(sorted, p) {
   if (sorted.length === 0) return 0;
-  const idx = Math.ceil((p / 100) * sorted.length) - 1;
-  return sorted[Math.max(0, idx)];
+  // Nearest-rank method: ceiling of (p/100 * n), 1-indexed
+  const rank = Math.ceil((p / 100) * sorted.length);
+  return sorted[Math.min(rank, sorted.length) - 1];
 }
 
 /** Sort an array in place and return it. Call once, then pass to percentile(). */
@@ -95,6 +96,7 @@ export class MetricsCollector {
         batchP50: percentile(wBatch, 50),
         batchP95: percentile(wBatch, 95),
         batchP99: percentile(wBatch, 99),
+        _rawLatencies: wLat, // for accurate summary percentiles (not sent to frontend)
       },
       read: {
         ops: readerMetrics.ops,
@@ -102,6 +104,7 @@ export class MetricsCollector {
         p50: percentile(rLat, 50),
         p95: percentile(rLat, 95),
         p99: percentile(rLat, 99),
+        _rawLatencies: rLat, // for accurate summary percentiles (not sent to frontend)
       },
       system: this._latestSystem,
     };

@@ -112,10 +112,9 @@ function computeSummary(timeseries, config) {
   // Sustain-phase metrics for averages
   const sustainWriteOps = [];
   const sustainReadOps = [];
-  const sustainWriteP50s = [];
-  const sustainWriteP99s = [];
-  const sustainReadP50s = [];
-  const sustainReadP99s = [];
+  // Collect ALL raw latencies from sustain phases for true percentile computation
+  const allSustainWriteLatencies = [];
+  const allSustainReadLatencies = [];
 
   // Per-spike accumulators
   const numSpikes = config.numSpikes || 1;
@@ -152,10 +151,13 @@ function computeSummary(timeseries, config) {
     if (phase === 'sustain') {
       sustainWriteOps.push(writeOps);
       sustainReadOps.push(readOps);
-      sustainWriteP50s.push(writeP50);
-      sustainWriteP99s.push(writeP99);
-      sustainReadP50s.push(readP50);
-      sustainReadP99s.push(readP99);
+      // Collect raw latencies if available, otherwise fall back to per-second percentiles
+      if (entry.write?._rawLatencies) {
+        allSustainWriteLatencies.push(...entry.write._rawLatencies);
+      }
+      if (entry.read?._rawLatencies) {
+        allSustainReadLatencies.push(...entry.read._rawLatencies);
+      }
     }
 
     // Per-spike aggregation
@@ -178,13 +180,15 @@ function computeSummary(timeseries, config) {
     ? sustainReadOps.reduce((a, b) => a + b, 0) / sustainReadOps.length
     : 0;
 
-  // Percentiles across all sustain-phase seconds
-  const writeP50 = computePercentile(sustainWriteP50s, 50);
-  const writeP90 = computePercentile(sustainWriteP99s, 90);
-  const writeP99 = computePercentile(sustainWriteP99s, 99);
-  const readP50 = computePercentile(sustainReadP50s, 50);
-  const readP90 = computePercentile(sustainReadP99s, 90);
-  const readP99 = computePercentile(sustainReadP99s, 99);
+  // True percentiles from ALL raw latencies across sustain phases (no double-percentiling)
+  const sortedWriteLat = allSustainWriteLatencies.sort((a, b) => a - b);
+  const sortedReadLat = allSustainReadLatencies.sort((a, b) => a - b);
+  const writeP50 = computePercentile(sortedWriteLat, 50);
+  const writeP90 = computePercentile(sortedWriteLat, 90);
+  const writeP99 = computePercentile(sortedWriteLat, 99);
+  const readP50 = computePercentile(sortedReadLat, 50);
+  const readP90 = computePercentile(sortedReadLat, 90);
+  const readP99 = computePercentile(sortedReadLat, 99);
 
   const totalOps = totalWriteOps + totalReadOps;
   const totalErrors = totalWriteErrors + totalReadErrors;
@@ -260,7 +264,11 @@ router.post('/', (req, res) => {
       (snapshot) => {
         timeseries.push(snapshot);
         if (broadcastMetrics) {
-          broadcastMetrics(id, snapshot);
+          // Strip raw latency arrays before sending over WebSocket (too large)
+          const { write, read, ...rest } = snapshot;
+          const { _rawLatencies: _wRaw, ...wClean } = write || {};
+          const { _rawLatencies: _rRaw, ...rClean } = read || {};
+          broadcastMetrics(id, { ...rest, write: wClean, read: rClean });
         }
       },
       // onStatusChange
@@ -278,7 +286,13 @@ router.post('/', (req, res) => {
           // Compute summary and persist
           const fullTimeseries = timeseries.length > 0 ? timeseries : manager.getHistory();
           const summary = computeSummary(fullTimeseries, config);
-          updateRunResults(id, summary, fullTimeseries);
+          // Strip raw latency arrays before persisting (too large for SQLite)
+          const cleanTimeseries = fullTimeseries.map(({ write, read, ...rest }) => {
+            const { _rawLatencies: _w, ...wClean } = write || {};
+            const { _rawLatencies: _r, ...rClean } = read || {};
+            return { ...rest, write: wClean, read: rClean };
+          });
+          updateRunResults(id, summary, cleanTimeseries);
 
           // Clean up active run
           activeRuns.delete(id);

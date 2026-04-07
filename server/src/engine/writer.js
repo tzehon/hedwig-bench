@@ -65,29 +65,34 @@ export class WriteWorker {
     while (!this._stopped) {
       try {
         if (mode === 'bulk') {
+          // Start timer BEFORE acquire to capture coordinated omission
+          const queueStart = performance.now();
           if (!this._uncapped) await this._rateLimiter.acquire(batchSize);
           const docs = generateDocuments(batchSize, docSizeKB, userPoolSize);
-          const start = performance.now();
+          const dbStart = performance.now();
           await this._collection.insertMany(docs, {
             ordered: false,
             writeConcern: this._writeConcern,
           });
-          const elapsed = performance.now() - start;
-          const perDoc = elapsed / batchSize;
+          const dbElapsed = performance.now() - dbStart;
+          const totalElapsed = performance.now() - queueStart;
           this.opsCount += batchSize;
-          this.batchLatencies.push(elapsed);
-          this.latencies.push(perDoc);
+          this.batchLatencies.push(dbElapsed);
+          // Per-doc latency includes queue wait (coordinated omission correction)
+          this.latencies.push(totalElapsed / batchSize);
         } else {
+          const queueStart = performance.now();
           if (!this._uncapped) await this._rateLimiter.acquire(1);
           const doc = generateDocument(docSizeKB, userPoolSize);
-          const start = performance.now();
+          const dbStart = performance.now();
           await this._collection.insertOne(doc, {
             writeConcern: this._writeConcern,
           });
-          const elapsed = performance.now() - start;
+          const dbElapsed = performance.now() - dbStart;
+          const totalElapsed = performance.now() - queueStart;
           this.opsCount += 1;
-          this.batchLatencies.push(elapsed);
-          this.latencies.push(elapsed);
+          this.batchLatencies.push(dbElapsed);
+          this.latencies.push(totalElapsed);
         }
       } catch (err) {
         if (this._stopped) break;
