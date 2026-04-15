@@ -5,7 +5,6 @@ MongoDB Atlas inbox workload benchmark tool with real-time dashboard, Atlas Sear
 Simulates the bursty campaign-blast write pattern of the Hedwig inbox messaging service (0 → 35k+ write ops/sec spikes) with variable-rate reads (3.5k–10k RPS, configurable isolation vs concurrent). Provides live charts, run comparison, and interactive demos of MongoDB query and search capabilities.
 
 ![Architecture](https://img.shields.io/badge/stack-React%20%2B%20Express%20%2B%20MongoDB-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
