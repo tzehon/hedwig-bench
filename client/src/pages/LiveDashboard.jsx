@@ -363,13 +363,15 @@ export default function LiveDashboard() {
     const sustain = runConfig.sustainSeconds || 180;
     const gap = runConfig.gapSeconds || 60;
     const spikeLen = ramp + sustain + 60;
-    const gaps = Math.max(0, ns - 1) * gap;
-    const writeTime = ns * spikeLen + gaps;
+    const writeActive = ns * spikeLen;
     const isoPct = runConfig.readIsolationPct || 0;
-    const extraReadOnly = isoPct > 0
-      ? Math.max(0, Math.ceil((isoPct / 100 * writeTime - gaps) / (1 - isoPct / 100)))
-      : 0;
-    return writeTime + extraReadOnly;
+    if (isoPct > 0) {
+      const pct = isoPct / 100;
+      const totalIso = Math.ceil((pct * writeActive) / (1 - pct));
+      const block = ns > 0 ? Math.ceil(totalIso / ns) : 0;
+      return writeActive + ns * block;
+    }
+    return writeActive + Math.max(0, ns - 1) * gap;
   })();
   const progressPct = Math.min(100, (currentStats.elapsedSeconds / totalDuration) * 100);
   const highErrorRate = currentStats.errorRate > 1;
@@ -381,8 +383,7 @@ export default function LiveDashboard() {
     const ns = runConfig.numSpikes || 1;
     const ramp = runConfig.rampSeconds || 120;
     const sustain = runConfig.sustainSeconds || 180;
-    const gap = runConfig.gapSeconds || 60;
-    return ns * (ramp + sustain + 60) + Math.max(0, ns - 1) * gap;
+    return ns * (ramp + sustain + 60);
   })();
   const concurrentPct = totalDuration > 0 ? (writeScheduleTime / totalDuration) * 100 : 100;
   const isConcurrentPhase = currentStats.phase !== 'read_only' && currentStats.phase !== 'complete';

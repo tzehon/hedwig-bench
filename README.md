@@ -266,37 +266,31 @@ Two modes are available:
 
 **Constant mode** (legacy): Reads run at a fixed rate throughout the entire benchmark, concurrent with writes. No isolation phase is appended. Useful as a simple baseline.
 
-**Variable mode** (default): Reads run throughout the entire benchmark at a variable rate (min/avg/max configurable):
+**Variable mode** (default): Isolation blocks are **interleaved after each write spike**, not appended at the end. Each phase has its own read rate and query pattern:
 
-- **During write-active phases** (ramp/sustain/cooldown): Reads run at a computed concurrent rate, calculated to hit the target average across the full run.
-- **During gaps**: Reads run at the minimum RPS.
-- **Read-only isolation phase** (appended after all write spikes): Reads follow a triangle spike pattern (min → max → min) with no concurrent writes. The duration is sized so that total isolation time = the configured isolation percentage (default 40%).
+- **Concurrent phases** (ramp/sustain/cooldown): Reads at 8,000 RPS using point reads (1 item). Reads use `secondaryPreferred` to avoid contention with writes on the primary.
+- **Isolation blocks** (after each spike): Reads at 2,000 RPS using list queries (10–50 items, avg ~30). No concurrent writes.
 
 ```
-Target Read RPS
-    ▲
-    │                                              ╱╲
-max │──────────────────────────────────────────────╱──╲──────────
-    │                                            ╱    ╲
-    │  ┌─────────────────────────────────┐      ╱      ╲
-avg │──│  concurrent rate (write-active) │─────╱────────╲───────
-    │  └─────────────────────────────────┘    ╱          ╲
-min │────────────────────────────────────────╱────────────╲──────
-    │        60% of run (writes on)      │    40% isolation
-  0 │───────────────────────────────────────────────────────── time
+  Write RPS                              Read RPS
+    ▲                                      ▲
+35k │  ╱──╲        ╱──╲                 8k │──────╲     ╱──────╲
+    │ ╱    ╲      ╱    ╲                   │       ╲   ╱        ╲
+    │╱      ╲    ╱      ╲              2k │        ╲─╱          ╲────
+  0 │────────╲──╱────────╲────           0 │─────────────────────────
+    │ Spike1  Iso  Spike2  Iso             │ Conc.  Iso  Conc.   Iso
 ```
-
-The concurrent read rate is automatically computed from the min/avg/max and isolation % so that the weighted average across the entire run equals the target average.
 
 #### Total duration formula
 
 ```
-writeTime = numSpikes × (rampSeconds + sustainSeconds + 60) + (numSpikes - 1) × gapSeconds
-extraReadOnly = max(0, ceil((isolationPct × writeTime − gapTime) / (1 − isolationPct)))
-total = writeTime + extraReadOnly
+writeActive = numSpikes × (rampSeconds + sustainSeconds + 60)
+totalIsolation = ceil(isolationPct × writeActive / (1 − isolationPct))
+blockDuration = ceil(totalIsolation / numSpikes)
+total = writeActive + numSpikes × blockDuration
 ```
 
-Default (2 spikes, 40% isolation): `writeTime = 510s, extraReadOnly = 290s → total = 800s ≈ 13.3 minutes`
+Default (2 spikes, 40% isolation): `writeActive = 480s, blockDuration = 160s → total = 480 + 320 = 800s ≈ 13.3 minutes`
 
 ### Document Schema
 
@@ -342,13 +336,15 @@ Fixed at the **Extended** profile (4 indexes):
 
 The read worker runs at a variable rate (paced by a token-bucket rate limiter updated each second) and switches query patterns based on the current phase:
 
-**Concurrent mode** (60% of run — writes active): point reads only, returning 1 item per query.
+All reads use `readPreference: secondaryPreferred` to avoid contention with writes on the primary.
+
+**Concurrent mode** (60% of run — writes active, 8k RPS): point reads only, returning 1 item per query. Pre-seeded msg_id cache ensures reads hit real documents.
 
 | Pattern | MongoDB Query | Items returned |
 |---------|---------------|----------------|
 | **Point read** | `findOne({ user_id, msg_id })` | 1 |
 
-**Isolation mode** (40% of run — read-only, 2k RPS): list queries returning 10–50 items (avg ~30) per query.
+**Isolation mode** (40% of run — read-only, 2k RPS): list queries returning 10–50 items (avg ~30) per query. Interleaved after each write spike.
 
 | Pattern | Weight | MongoDB Query | Items returned |
 |---------|--------|---------------|----------------|
@@ -428,7 +424,7 @@ The load generation engine lives in `server/src/engine/`:
 | **Rate Limiter** | `rateLimiter.js` | Token-bucket with monotonic-clock-based 10ms refill. Supports dynamic rate updates. Bucket size tracks current rate to prevent burst overshoot. |
 | **Spike Scheduler** | `spike.js` | Pre-computes the run schedule as `{ second, targetWriteRPS, targetReadRPS }` entries. Calculates isolation phase duration and concurrent read rate. Also used client-side for spike preview SVG. |
 | **Write Worker** | `writer.js` | 50 concurrent lanes. Each lane: acquire tokens → generate docs → `insertMany`/`insertOne` → record per-doc latency. Supports uncapped mode (bypasses rate limiter). |
-| **Read Worker** | `reader.js` | 50 concurrent lanes. Each lane picks a random query pattern (point read 30%, recent messages 40%, filtered inbox 30%). Rate dynamically updated each second from the schedule. |
+| **Read Worker** | `reader.js` | 150 concurrent lanes using `secondaryPreferred`. Phase-aware: point reads (1 item) during concurrent, list queries (10–50 items) during isolation. Rate dynamically updated each second. |
 | **Metrics Collector** | `metrics.js` | Every second: drains worker accumulators, sorts latencies once, computes p50/p95/p99. Every 5 seconds: `serverStatus` for system metrics (per-second deltas). |
 | **Run Manager** | `manager.js` | Orchestrates: connect → (delete data / drop collection) → create indexes → generate schedule → start workers → tick loop (updates both write and read rate limiters each second) → cleanup. |
 

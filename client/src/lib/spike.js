@@ -1,10 +1,9 @@
 // Client-side spike schedule generator (mirrors server logic for previews)
 
-function calcExtraReadOnlySeconds(writeScheduleTime, gapTotalSeconds, readIsolationPct) {
+function calcTotalIsolationSeconds(writeActiveSeconds, readIsolationPct) {
   if (readIsolationPct <= 0) return 0;
   const pct = readIsolationPct / 100;
-  const extra = Math.ceil((pct * writeScheduleTime - gapTotalSeconds) / (1 - pct));
-  return Math.max(0, extra);
+  return Math.ceil((pct * writeActiveSeconds) / (1 - pct));
 }
 
 export function generateSchedule({
@@ -14,43 +13,40 @@ export function generateSchedule({
   const schedule = [];
   let t = 0;
 
-  const writeActiveSeconds = numSpikes * (rampSeconds + sustainSeconds + 60);
-  const gapTotalSeconds = Math.max(0, numSpikes - 1) * gapSeconds;
-  const writeScheduleTime = writeActiveSeconds + gapTotalSeconds;
-  const extraReadOnly = calcExtraReadOnlySeconds(writeScheduleTime, gapTotalSeconds, readIsolationPct);
-
-  const concurrentRate = readRPSConcurrent;
-  const isolationRate = readRPSIsolation;
+  const spikeLength = rampSeconds + sustainSeconds + 60;
+  const writeActiveSeconds = numSpikes * spikeLength;
+  const totalIsolation = calcTotalIsolationSeconds(writeActiveSeconds, readIsolationPct);
+  const blockDuration = numSpikes > 0 ? Math.ceil(totalIsolation / numSpikes) : 0;
 
   for (let spike = 0; spike < numSpikes; spike++) {
     for (let s = 0; s < rampSeconds; s++) {
       schedule.push({
         second: t++,
         targetWriteRPS: targetWriteRPS * (s / rampSeconds),
-        targetReadRPS: concurrentRate,
+        targetReadRPS: readRPSConcurrent,
       });
     }
     for (let s = 0; s < sustainSeconds; s++) {
-      schedule.push({ second: t++, targetWriteRPS, targetReadRPS: concurrentRate });
+      schedule.push({ second: t++, targetWriteRPS, targetReadRPS: readRPSConcurrent });
     }
     for (let s = 0; s < 60; s++) {
       schedule.push({
         second: t++,
         targetWriteRPS: targetWriteRPS * (1 - s / 60),
-        targetReadRPS: concurrentRate,
+        targetReadRPS: readRPSConcurrent,
       });
     }
-    if (spike < numSpikes - 1) {
-      for (let s = 0; s < gapSeconds; s++) {
-        schedule.push({ second: t++, targetWriteRPS: 0, targetReadRPS: isolationRate });
-      }
-    }
-  }
 
-  // Read-only isolation phase (flat rate)
-  if (extraReadOnly > 0) {
-    for (let s = 0; s < extraReadOnly; s++) {
-      schedule.push({ second: t++, targetWriteRPS: 0, targetReadRPS: isolationRate });
+    if (readIsolationPct > 0 && blockDuration > 0) {
+      // Interleaved isolation block after each spike
+      for (let s = 0; s < blockDuration; s++) {
+        schedule.push({ second: t++, targetWriteRPS: 0, targetReadRPS: readRPSIsolation });
+      }
+    } else if (spike < numSpikes - 1) {
+      // Legacy: gap between spikes
+      for (let s = 0; s < gapSeconds; s++) {
+        schedule.push({ second: t++, targetWriteRPS: 0, targetReadRPS: readRPSConcurrent });
+      }
     }
   }
 
@@ -59,8 +55,14 @@ export function generateSchedule({
 
 export function getTotalDuration({ numSpikes, rampSeconds, sustainSeconds, gapSeconds, readIsolationPct = 0 }) {
   const spikeLength = rampSeconds + sustainSeconds + 60;
+  const writeActiveSeconds = numSpikes * spikeLength;
+
+  if (readIsolationPct > 0) {
+    const totalIsolation = calcTotalIsolationSeconds(writeActiveSeconds, readIsolationPct);
+    const blockDuration = numSpikes > 0 ? Math.ceil(totalIsolation / numSpikes) : 0;
+    return writeActiveSeconds + numSpikes * blockDuration;
+  }
+
   const gaps = Math.max(0, numSpikes - 1) * gapSeconds;
-  const writeScheduleTime = numSpikes * spikeLength + gaps;
-  const extraReadOnly = calcExtraReadOnlySeconds(writeScheduleTime, gaps, readIsolationPct);
-  return writeScheduleTime + extraReadOnly;
+  return writeActiveSeconds + gaps;
 }

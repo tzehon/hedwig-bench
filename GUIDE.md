@@ -80,7 +80,7 @@ Go back to the home page (`/`). Your URI is still saved.
 
 1. Select **Drop collection** under "Before run" (start clean)
 2. Click **Start Benchmark**, confirm
-3. Watch the Live Dashboard for ~13.5 minutes (includes read-only isolation phase)
+3. Watch the Live Dashboard for ~13.5 minutes (isolation blocks interleave after each spike)
 4. Review results when complete
 
 ### Second run (with existing data)

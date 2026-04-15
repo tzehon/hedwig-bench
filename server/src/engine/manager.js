@@ -1,4 +1,4 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, ReadPreference } from 'mongodb';
 import { RateLimiter } from './rateLimiter.js';
 import { WriteWorker } from './writer.js';
 import { ReadWorker } from './reader.js';
@@ -10,16 +10,25 @@ const COOLDOWN_SECONDS = 60;
 
 /**
  * Determine the phase name for a given second in the schedule.
+ * Supports interleaved isolation blocks after each spike.
  */
 function resolvePhase(second, config) {
   const { rampSeconds, sustainSeconds, gapSeconds, numSpikes } = config;
+  const readIsolationPct = config.readIsolationPct ?? 0;
   const spikeLength = rampSeconds + sustainSeconds + COOLDOWN_SECONDS;
+
+  // Calculate isolation block duration
+  const writeActiveSeconds = numSpikes * spikeLength;
+  let isolationBlockDuration = 0;
+  if (readIsolationPct > 0) {
+    const pct = readIsolationPct / 100;
+    const totalIsolation = Math.ceil((pct * writeActiveSeconds) / (1 - pct));
+    isolationBlockDuration = numSpikes > 0 ? Math.ceil(totalIsolation / numSpikes) : 0;
+  }
 
   let offset = second;
 
   for (let spike = 0; spike < numSpikes; spike++) {
-    const isLastSpike = spike === numSpikes - 1;
-
     if (offset < rampSeconds) return 'ramp';
     offset -= rampSeconds;
 
@@ -29,20 +38,13 @@ function resolvePhase(second, config) {
     if (offset < COOLDOWN_SECONDS) return 'cooldown';
     offset -= COOLDOWN_SECONDS;
 
-    if (!isLastSpike) {
+    if (readIsolationPct > 0 && isolationBlockDuration > 0) {
+      if (offset < isolationBlockDuration) return 'read_only';
+      offset -= isolationBlockDuration;
+    } else if (spike < numSpikes - 1) {
       if (offset < gapSeconds) return 'gap';
       offset -= gapSeconds;
     }
-  }
-
-  // After all write spikes: check for read-only isolation phase
-  const readIsolationPct = config.readIsolationPct ?? 0;
-  if (readIsolationPct > 0) {
-    const gaps = Math.max(0, numSpikes - 1) * gapSeconds;
-    const writeScheduleTime = numSpikes * spikeLength + gaps;
-    const pct = readIsolationPct / 100;
-    const extraReadOnly = Math.max(0, Math.ceil((pct * writeScheduleTime - gaps) / (1 - pct)));
-    if (offset < extraReadOnly) return 'read_only';
   }
 
   return 'complete';
@@ -186,7 +188,12 @@ export class RunManager {
         uncapped: this._config.uncapped || false,
       });
 
-      this._reader = new ReadWorker(this._collection, this._readRateLimiter, {
+      // Read collection uses secondaryPreferred to avoid contention with writes on primary
+      const readCollection = this._db.collection(this._config.collectionName, {
+        readPreference: ReadPreference.SECONDARY_PREFERRED,
+      });
+
+      this._reader = new ReadWorker(readCollection, this._readRateLimiter, {
         userPoolSize: this._config.userPoolSize,
         concurrency: this._config.readConcurrency,
       });

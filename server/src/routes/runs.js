@@ -46,47 +46,39 @@ const COOLDOWN_SECONDS = 60;
  */
 function resolveSpikeAndPhase(second, config) {
   const { rampSeconds, sustainSeconds, gapSeconds, numSpikes } = config;
+  const readIsolationPct = config.readIsolationPct ?? 0;
   const spikeLength = rampSeconds + sustainSeconds + COOLDOWN_SECONDS;
-  const cycleLength = spikeLength + gapSeconds;
+
+  // Calculate isolation block duration (interleaved after each spike)
+  const writeActiveSeconds = numSpikes * spikeLength;
+  let isolationBlockDuration = 0;
+  if (readIsolationPct > 0) {
+    const pct = readIsolationPct / 100;
+    const totalIsolation = Math.ceil((pct * writeActiveSeconds) / (1 - pct));
+    isolationBlockDuration = numSpikes > 0 ? Math.ceil(totalIsolation / numSpikes) : 0;
+  }
 
   let offset = second;
 
   for (let spike = 0; spike < numSpikes; spike++) {
-    const isLastSpike = spike === numSpikes - 1;
-    const thisCycleLen = isLastSpike ? spikeLength : cycleLength;
+    // Write phases
+    if (offset < rampSeconds) return { spikeIndex: spike, phase: 'ramp' };
+    offset -= rampSeconds;
 
-    if (offset < thisCycleLen) {
-      // This second belongs to this spike
-      let phase;
-      let localOffset = offset;
-      if (localOffset < rampSeconds) {
-        phase = 'ramp';
-      } else {
-        localOffset -= rampSeconds;
-        if (localOffset < sustainSeconds) {
-          phase = 'sustain';
-        } else {
-          localOffset -= sustainSeconds;
-          if (localOffset < COOLDOWN_SECONDS) {
-            phase = 'cooldown';
-          } else {
-            phase = 'gap';
-          }
-        }
-      }
-      return { spikeIndex: spike, phase };
+    if (offset < sustainSeconds) return { spikeIndex: spike, phase: 'sustain' };
+    offset -= sustainSeconds;
+
+    if (offset < COOLDOWN_SECONDS) return { spikeIndex: spike, phase: 'cooldown' };
+    offset -= COOLDOWN_SECONDS;
+
+    // Isolation or gap after spike
+    if (readIsolationPct > 0 && isolationBlockDuration > 0) {
+      if (offset < isolationBlockDuration) return { spikeIndex: spike, phase: 'read_only' };
+      offset -= isolationBlockDuration;
+    } else if (spike < numSpikes - 1) {
+      if (offset < gapSeconds) return { spikeIndex: spike, phase: 'gap' };
+      offset -= gapSeconds;
     }
-    offset -= isLastSpike ? spikeLength : cycleLength;
-  }
-
-  // After all write spikes: check for read-only isolation phase
-  const readIsolationPct = config.readIsolationPct ?? 0;
-  if (readIsolationPct > 0) {
-    const gaps = Math.max(0, numSpikes - 1) * gapSeconds;
-    const writeScheduleTime = numSpikes * spikeLength + gaps;
-    const pct = readIsolationPct / 100;
-    const extraReadOnly = Math.max(0, Math.ceil((pct * writeScheduleTime - gaps) / (1 - pct)));
-    if (offset < extraReadOnly) return { spikeIndex: -1, phase: 'read_only' };
   }
 
   return { spikeIndex: -1, phase: 'complete' };
