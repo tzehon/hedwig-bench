@@ -458,6 +458,58 @@ export default function ResultsPage() {
       </div>
 
       {/* ============================================================= */}
+      {/* Read Targets vs Achieved                                       */}
+      {/* ============================================================= */}
+      {(config.readIsolationPct > 0) && (
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <h3 className="text-sm font-semibold text-gray-100 mb-3">Read Performance: Target vs Achieved</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="text-left text-xs text-gray-400 font-medium py-2 pr-4">Phase</th>
+                  <th className="text-right text-xs text-gray-400 font-medium py-2 px-4">Target QPS</th>
+                  <th className="text-right text-xs text-gray-400 font-medium py-2 px-4">Docs/query</th>
+                  <th className="text-right text-xs text-gray-400 font-medium py-2 px-4">Target Docs/s</th>
+                  <th className="text-right text-xs text-gray-400 font-medium py-2 px-4">Achieved QPS</th>
+                  <th className="text-right text-xs text-gray-400 font-medium py-2 px-4">Achieved Docs/s</th>
+                  <th className="text-right text-xs text-gray-400 font-medium py-2 pl-4">p99 Latency</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-gray-800">
+                  <td className="py-2.5 pr-4">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      Concurrent ({100 - (config.readIsolationPct || 0)}%)
+                    </span>
+                  </td>
+                  <td className="text-right font-mono text-gray-200 px-4">{fmtRPS(config.readRPSConcurrent)}</td>
+                  <td className="text-right font-mono text-gray-200 px-4">1</td>
+                  <td className="text-right font-mono text-gray-200 px-4">{fmtRPS(config.readRPSConcurrent)}</td>
+                  <td className="text-right font-mono text-gray-100 font-semibold px-4">{fmtRPS(summary.avgConcurrentReadRPS)}</td>
+                  <td className="text-right font-mono text-gray-100 font-semibold px-4">{fmtRPS(summary.avgConcurrentReadRPS)}</td>
+                  <td className="text-right font-mono text-red-400 pl-4">{fmt(summary.concurrentReadP99)} ms</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 pr-4">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      Isolation ({config.readIsolationPct || 0}%)
+                    </span>
+                  </td>
+                  <td className="text-right font-mono text-gray-200 px-4">{fmtRPS(config.readRPSIsolation)}</td>
+                  <td className="text-right font-mono text-gray-200 px-4">~30 avg</td>
+                  <td className="text-right font-mono text-gray-200 px-4">{fmtRPS((config.readRPSIsolation || 0) * 30)}</td>
+                  <td className="text-right font-mono text-gray-100 font-semibold px-4">{fmtRPS(summary.avgIsolationReadRPS)}</td>
+                  <td className="text-right font-mono text-gray-100 font-semibold px-4">{fmtRPS((summary.avgIsolationReadRPS || 0) * 30)}</td>
+                  <td className="text-right font-mono text-red-400 pl-4">{fmt(summary.isolationReadP99)} ms</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
       {/* Full Charts                                                    */}
       {/* ============================================================= */}
       {hasTimeseries ? (
