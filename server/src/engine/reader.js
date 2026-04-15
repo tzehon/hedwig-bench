@@ -110,7 +110,7 @@ export class ReadWorker {
             const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
             results = await this._collection
               .find({ user_id: userId, created_at: { $gt: since } })
-              .project({ body: 0, msg_id: 1, user_id: 1 })
+              .project({ body: 0 })
               .sort({ created_at: -1 })
               .limit(limit)
               .toArray();
@@ -119,7 +119,7 @@ export class ReadWorker {
             const status = STATUSES[Math.floor(Math.random() * STATUSES.length)];
             results = await this._collection
               .find({ user_id: userId, status })
-              .project({ body: 0, msg_id: 1, user_id: 1 })
+              .project({ body: 0 })
               .sort({ created_at: -1 })
               .limit(limit)
               .toArray();
