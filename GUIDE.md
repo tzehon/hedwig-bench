@@ -69,7 +69,8 @@ Go back to the home page (`/`). Your URI is still saved.
 | Concurrent read RPS | 8,000 | Point reads during write-active phases (1 item) |
 | Isolation read RPS | 2,000 | List queries during read-only phase (10–50 items, avg ~30) |
 | Read isolation | 40% | 40% of run is read-only, 60% concurrent with writes |
-| Read lanes | 50 | Increase if reads can't keep up at high RPS |
+| Read lanes | 150 | Total lanes distributed across worker threads |
+| Read worker threads | 4 | Each thread has its own connection pool and event loop |
 | Spikes | 2 | Simulates multiple campaign blasts |
 | Ramp | 60s | Gradual ramp to peak |
 | Sustain | 120s | 2 minutes at peak per spike |

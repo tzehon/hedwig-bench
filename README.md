@@ -225,7 +225,8 @@ For each query, the results show:
 | Read | Concurrent RPS | `8,000` | 100–20,000 | Variable mode: read ops/sec during write-active phases (point reads, 1 item) |
 | Read | Isolation RPS | `2,000` | 100–20,000 | Variable mode: read ops/sec during read-only phase (list queries, 10–50 items, avg ~30) |
 | Read | Isolation % | `40` | 0–80 | Variable mode: percentage of total run time that is read-only (no concurrent writes) |
-| Read | Concurrency (lanes) | `50` | 1–500 | Concurrent read lanes. Increase for high RPS targets (>5k) or high-latency setups. |
+| Read | Concurrency (lanes) | `150` | 1–2,000 | Total concurrent read lanes distributed across worker threads. |
+| Read | Worker threads | `4` | 1–16 | Number of worker threads for reads. Each thread has its own event loop, connection pool, and rate limiter. Eliminates single-thread bottleneck. |
 | Spike | Number of spikes | `2` | 1–10 | How many write spikes |
 | Spike | Ramp-up (seconds) | `60` | 30–300 | Linear ramp from 0 → target RPS |
 | Spike | Sustain (seconds) | `120` | 30–600 | Hold at target RPS |
@@ -431,11 +432,13 @@ The load generation engine lives in `server/src/engine/`:
 | **Rate Limiter** | `rateLimiter.js` | Token-bucket with monotonic-clock-based 10ms refill. Supports dynamic rate updates. Bucket size tracks current rate to prevent burst overshoot. |
 | **Spike Scheduler** | `spike.js` | Pre-computes the run schedule as `{ second, targetWriteRPS, targetReadRPS }` entries. Calculates isolation phase duration and concurrent read rate. Also used client-side for spike preview SVG. |
 | **Write Worker** | `writer.js` | 50 concurrent lanes. Each lane: acquire tokens → generate docs → `insertMany`/`insertOne` → record per-doc latency. Supports uncapped mode (bypasses rate limiter). |
-| **Read Worker** | `reader.js` | 150 concurrent lanes using `secondaryPreferred`. Phase-aware: point reads (1 item) during concurrent, list queries (10–50 items) during isolation. Rate dynamically updated each second. |
+| **Read Worker Pool** | `readWorkerPool.js` | Spawns N worker threads for reads. Each thread runs its own `ReadWorker` with independent connection pool and rate limiter. Eliminates single-thread event loop bottleneck. |
+| **Read Worker** | `reader.js` | Phase-aware read lanes: point reads (1 item) during concurrent, list queries (10–50 items, avg ~30) during isolation. Runs inside worker threads. |
+| **Read Worker Thread** | `readWorkerThread.js` | Worker thread entry point. Creates own MongoClient, RateLimiter, ReadWorker. Communicates with main thread via postMessage. |
 | **Metrics Collector** | `metrics.js` | Every second: drains worker accumulators, sorts latencies once, computes p50/p95/p99. Every 5 seconds: `serverStatus` for system metrics (per-second deltas). |
 | **Run Manager** | `manager.js` | Orchestrates: connect → (delete data / drop collection) → create indexes → generate schedule → start workers → tick loop (updates both write and read rate limiters each second) → cleanup. |
 
-**Concurrency model**: Async concurrency pools (not `worker_threads`). 50 write lanes + 50 read lanes sharing a connection pool of 200. At 35k RPS with batch 500, the client uses ~4% CPU for doc generation — the rest is async IO.
+**Concurrency model**: Writes use async concurrency pools on the main thread. Reads run in N worker threads (default 4), each with its own event loop, MongoDB connection pool, and rate limiter. This eliminates the single-thread bottleneck that inflates read latency under high concurrent load.
 
 ---
 
