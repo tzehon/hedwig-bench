@@ -60,9 +60,14 @@ export async function setupIndexes(collection, profile) {
  */
 export async function setupSharding(db, collectionName) {
   const admin = db.admin();
+  const collection = db.collection(collectionName);
 
   // Enable sharding on the database (no-op on MongoDB 6.0+ but harmless)
   await admin.command({ enableSharding: db.databaseName });
+
+  // Create the shard key index first — required if the collection is not empty.
+  // shardCollection only auto-creates the index on empty collections.
+  await collection.createIndex({ user_id: 'hashed' }, { name: 'idx_user_id_hashed' });
 
   // Shard the collection with a hashed shard key on user_id
   try {

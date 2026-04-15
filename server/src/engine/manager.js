@@ -143,7 +143,7 @@ export class RunManager {
       // ── 4. Set up indexes ──
       await setupIndexes(this._collection, this._config.indexProfile);
 
-      // ── 4. Generate spike schedule ──
+      // ── 5. Generate spike schedule ──
       const scheduleConfig = {
         targetWriteRPS: this._config.targetWriteRPS,
         numSpikes: this._config.numSpikes,
@@ -165,7 +165,7 @@ export class RunManager {
 
       const totalDuration = getTotalDurationSeconds(scheduleConfig);
 
-      // ── 5. Create rate limiters ──
+      // ── 6. Create rate limiters ──
       // Write rate limiter starts at 0; the tick loop will update it each second
       this._writeRateLimiter = new RateLimiter(
         0,
@@ -173,11 +173,11 @@ export class RunManager {
       );
       // Read rate limiter — starts at the first schedule entry's read rate;
       // the tick loop will update it each second for variable read patterns
-      const initialReadRPS = this._schedule[0]?.targetReadRPS ?? this._config.readRPSAvg ?? this._config.targetReadRPS ?? 100;
-      const maxReadRPS = this._config.readRPSMax ?? initialReadRPS;
-      this._readRateLimiter = new RateLimiter(initialReadRPS, Math.max(maxReadRPS, initialReadRPS));
+      const initialReadRPS = this._schedule[0]?.targetReadRPS ?? this._config.readRPSConcurrent ?? 100;
+      const maxReadRPS = Math.max(this._config.readRPSConcurrent ?? 0, this._config.readRPSIsolation ?? 0, initialReadRPS);
+      this._readRateLimiter = new RateLimiter(initialReadRPS, maxReadRPS);
 
-      // ── 6. Create workers ──
+      // ── 7. Create workers ──
       // Normalize config field names (frontend sends docSize, writeConcern as 'w:1')
       const docSizeKB = this._config.docSizeKB ?? this._config.docSize ?? 3;
       const rawWC = this._config.writeConcern || '1';
@@ -203,7 +203,7 @@ export class RunManager {
         concurrency: this._config.readConcurrency,
       });
 
-      // ── 7. Create metrics collector ──
+      // ── 8. Create metrics collector ──
       this._metricsCollector = new MetricsCollector(
         this._writer,
         this._reader,
@@ -219,7 +219,7 @@ export class RunManager {
         }
       };
 
-      // ── 8. Pre-seed reader cache & start everything ──
+      // ── 9. Pre-seed reader cache & start everything ──
       await this._reader.seedCache();
       this._writer.start();
       this._reader.start();
@@ -228,7 +228,7 @@ export class RunManager {
       this._startTime = Date.now();
       this._currentSecond = 0;
 
-      // ── 9. Tick loop: update write rate each second ──
+      // ── 10. Tick loop: update rates each second ──
       this._tickTimer = setInterval(() => {
         if (this._stopped) return;
 
@@ -252,7 +252,7 @@ export class RunManager {
 
         // Switch read query patterns based on phase
         // Concurrent (writes active): point reads (1 item)
-        // Isolation (writes off): list queries (50–100 items)
+        // Isolation (writes off): list queries (10–50 items, avg ~30)
         this._reader.isolationMode = entry.targetWriteRPS === 0;
 
         this._currentSecond++;
