@@ -193,10 +193,8 @@ export class RunManager {
         uncapped: this._config.uncapped || false,
       });
 
-      // Read collection uses secondaryPreferred to avoid contention with writes on primary
-      const readCollection = this._db.collection(this._config.collectionName, {
-        readPreference: 'secondaryPreferred',
-      });
+      // Read collection — uses default readPreference (primary)
+      const readCollection = this._db.collection(this._config.collectionName);
 
       this._reader = new ReadWorker(readCollection, this._readRateLimiter, {
         userPoolSize: this._config.userPoolSize,
