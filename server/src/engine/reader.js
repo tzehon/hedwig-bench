@@ -40,7 +40,7 @@ export class ReadWorker {
     /**
      * Controls query pattern selection. Set by RunManager each tick.
      * false = concurrent (point reads, 1 item)
-     * true  = isolation (list queries, 50–100 items)
+     * true  = isolation (list queries, 10–50 items, avg ~30)
      */
     this.isolationMode = false;
 
