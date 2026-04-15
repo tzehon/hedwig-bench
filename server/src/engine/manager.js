@@ -144,10 +144,13 @@ export class RunManager {
         sustainSeconds: this._config.sustainSeconds,
         gapSeconds: this._config.gapSeconds,
         // Read schedule config
+        readRPSConcurrent: this._config.readRPSConcurrent,
+        readRPSIsolation: this._config.readRPSIsolation,
+        readIsolationPct: this._config.readIsolationPct,
+        // Legacy fallbacks
         readRPSMin: this._config.readRPSMin,
         readRPSMax: this._config.readRPSMax,
         readRPSAvg: this._config.readRPSAvg,
-        readIsolationPct: this._config.readIsolationPct,
         targetReadRPS: this._config.targetReadRPS,
         readRPS: this._config.readRPS,
       };
