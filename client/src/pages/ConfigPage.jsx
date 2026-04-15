@@ -287,6 +287,7 @@ export default function ConfigPage() {
   const [readRPSIsolation, setReadRPSIsolation] = useState(2000);
   const [readIsolationPct, setReadIsolationPct] = useState(40);
   const [readLanes, setReadLanes] = useState(150);
+  const [readWorkerThreads, setReadWorkerThreads] = useState(4);
 
   // -- Spike Pattern --
   const [numSpikes, setNumSpikes] = useState(2);
@@ -346,6 +347,7 @@ export default function ConfigPage() {
       readRPSIsolation,
       readIsolationPct,
       readConcurrency: readLanes,
+      readWorkerThreads,
       numSpikes,
       rampSeconds,
       sustainSeconds,
@@ -357,7 +359,7 @@ export default function ConfigPage() {
     [
       runName, mongoUri, dbName, collectionName, poolSize, deploymentMode, docSize, userPoolSize,
       indexProfile, writeMode, batchSize, targetWriteRPS, writeConcern, uncapped, writeLanes,
-      readRPSConcurrent, readRPSIsolation, readIsolationPct, readLanes,
+      readRPSConcurrent, readRPSIsolation, readIsolationPct, readLanes, readWorkerThreads,
       numSpikes, rampSeconds, sustainSeconds, gapSeconds,
       dropMode,
     ],
@@ -768,16 +770,32 @@ export default function ConfigPage() {
           </>
         )}
 
-        <div className="w-1/2">
-          <Label htmlFor="readLanes">Read concurrency (lanes)</Label>
-          <TextInput
-            id="readLanes"
-            type="number"
-            value={readLanes}
-            onChange={(e) => setReadLanes(Number(e.target.value))}
-            min={1}
-            max={500}
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="readLanes">Read concurrency (total lanes)</Label>
+            <TextInput
+              id="readLanes"
+              type="number"
+              value={readLanes}
+              onChange={(e) => setReadLanes(Number(e.target.value))}
+              min={1}
+              max={2000}
+            />
+          </div>
+          <div>
+            <Label htmlFor="readWorkerThreads">Read worker threads</Label>
+            <TextInput
+              id="readWorkerThreads"
+              type="number"
+              value={readWorkerThreads}
+              onChange={(e) => setReadWorkerThreads(Number(e.target.value))}
+              min={1}
+              max={16}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Lanes are distributed across threads. Each thread has its own connection pool and event loop.
+            </p>
+          </div>
         </div>
       </Section>
 

@@ -1,7 +1,7 @@
 import { MongoClient } from 'mongodb';
 import { RateLimiter } from './rateLimiter.js';
 import { WriteWorker } from './writer.js';
-import { ReadWorker } from './reader.js';
+import { ReadWorkerPool } from './readWorkerPool.js';
 import { MetricsCollector } from './metrics.js';
 import { setupIndexes, setupSharding } from './indexes.js';
 import { generateSchedule, getTotalDurationSeconds } from './spike.js';
@@ -87,7 +87,6 @@ export class RunManager {
     this._db = null;
     this._collection = null;
     this._writeRateLimiter = null;
-    this._readRateLimiter = null;
     this._writer = null;
     this._reader = null;
     this._metricsCollector = null;
@@ -112,10 +111,9 @@ export class RunManager {
       this._onStatusChange('running');
 
       // ── 1. Connect to MongoDB ──
-      // Auto-size pool: at least writeLanes + readLanes + headroom for system queries
+      // Pool for main thread: writes + system queries only (reads use worker thread pools)
       const writeLanes = this._config.writeConcurrency ?? 50;
-      const readLanes = this._config.readConcurrency ?? 50;
-      const minPool = writeLanes + readLanes + 20; // +20 for serverStatus, index ops, etc.
+      const minPool = writeLanes + 20; // +20 for serverStatus, index ops, etc.
       const poolSize = Math.max(this._config.poolSize ?? 200, minPool);
       this._client = new MongoClient(this._config.mongoUri, {
         maxPoolSize: poolSize,
@@ -165,23 +163,19 @@ export class RunManager {
 
       const totalDuration = getTotalDurationSeconds(scheduleConfig);
 
-      // ── 6. Create rate limiters ──
-      // Write rate limiter starts at 0; the tick loop will update it each second
+      // ── 6. Create rate limiter (writes only — reads have per-worker limiters) ──
       this._writeRateLimiter = new RateLimiter(
         0,
         Math.max(this._config.targetWriteRPS, 1),
       );
-      // Read rate limiter — starts at the first schedule entry's read rate;
-      // the tick loop will update it each second for variable read patterns
+
       const initialReadRPS = this._schedule[0]?.targetReadRPS ?? this._config.readRPSConcurrent ?? 100;
       const maxReadRPS = Math.max(this._config.readRPSConcurrent ?? 0, this._config.readRPSIsolation ?? 0, initialReadRPS);
-      this._readRateLimiter = new RateLimiter(initialReadRPS, maxReadRPS);
 
       // ── 7. Create workers ──
-      // Normalize config field names (frontend sends docSize, writeConcern as 'w:1')
       const docSizeKB = this._config.docSizeKB ?? this._config.docSize ?? 3;
       const rawWC = this._config.writeConcern || '1';
-      const writeConcern = rawWC.replace('w:', ''); // 'w:1' -> '1', 'w:majority' -> 'majority'
+      const writeConcern = rawWC.replace('w:', '');
 
       this._writer = new WriteWorker(this._collection, this._writeRateLimiter, {
         mode: this._config.writeMode,
@@ -193,12 +187,16 @@ export class RunManager {
         uncapped: this._config.uncapped || false,
       });
 
-      // Read collection — uses default readPreference (primary)
-      const readCollection = this._db.collection(this._config.collectionName);
-
-      this._reader = new ReadWorker(readCollection, this._readRateLimiter, {
+      // Read worker pool — spawns N worker threads, each with own connection + rate limiter
+      this._reader = new ReadWorkerPool({
+        mongoUri: this._config.mongoUri,
+        dbName: this._config.dbName,
+        collectionName: this._config.collectionName,
         userPoolSize: this._config.userPoolSize,
-        concurrency: this._config.readConcurrency,
+        concurrency: this._config.readConcurrency ?? 150,
+        initialReadRPS,
+        maxReadRPS,
+        threadCount: this._config.readWorkerThreads ?? 4,
       });
 
       // ── 8. Create metrics collector ──
@@ -244,9 +242,9 @@ export class RunManager {
         this._metricsCollector.targetWriteRPS = entry.targetWriteRPS;
         this._metricsCollector.targetReadRPS = entry.targetReadRPS;
 
-        // Update rate limiters
+        // Update write rate limiter + read worker pool rate
         this._writeRateLimiter.updateRate(entry.targetWriteRPS);
-        this._readRateLimiter.updateRate(entry.targetReadRPS);
+        this._reader.updateRate(entry.targetReadRPS);
 
         // Switch read query patterns based on phase
         // Concurrent (writes active): point reads (1 item)
@@ -302,9 +300,8 @@ export class RunManager {
       this._tickTimer = null;
     }
 
-    // Stop rate limiters (this unblocks workers waiting on acquire)
+    // Stop write rate limiter (read rate limiters are in worker threads)
     if (this._writeRateLimiter) this._writeRateLimiter.stop();
-    if (this._readRateLimiter) this._readRateLimiter.stop();
 
     // Stop workers (waits for in-flight ops)
     const workerStops = [];
