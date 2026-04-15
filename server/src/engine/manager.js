@@ -137,21 +137,23 @@ export class RunManager {
       await setupIndexes(this._collection, this._config.indexProfile);
 
       // ── 4. Generate spike schedule ──
-      this._schedule = generateSchedule({
+      const scheduleConfig = {
         targetWriteRPS: this._config.targetWriteRPS,
         numSpikes: this._config.numSpikes,
         rampSeconds: this._config.rampSeconds,
         sustainSeconds: this._config.sustainSeconds,
         gapSeconds: this._config.gapSeconds,
-      });
+        // Read schedule config
+        readRPSMin: this._config.readRPSMin,
+        readRPSMax: this._config.readRPSMax,
+        readRPSAvg: this._config.readRPSAvg,
+        readIsolationPct: this._config.readIsolationPct,
+        targetReadRPS: this._config.targetReadRPS,
+        readRPS: this._config.readRPS,
+      };
+      this._schedule = generateSchedule(scheduleConfig);
 
-      const totalDuration = getTotalDurationSeconds({
-        targetWriteRPS: this._config.targetWriteRPS,
-        numSpikes: this._config.numSpikes,
-        rampSeconds: this._config.rampSeconds,
-        sustainSeconds: this._config.sustainSeconds,
-        gapSeconds: this._config.gapSeconds,
-      });
+      const totalDuration = getTotalDurationSeconds(scheduleConfig);
 
       // ── 5. Create rate limiters ──
       // Write rate limiter starts at 0; the tick loop will update it each second
