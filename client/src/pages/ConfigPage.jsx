@@ -290,7 +290,7 @@ export default function ConfigPage() {
   const [readWorkerThreads, setReadWorkerThreads] = useState(4);
 
   // -- Spike Pattern --
-  const [numSpikes, setNumSpikes] = useState(2);
+  const [numSpikes, setNumSpikes] = useState(1);
   const [rampSeconds, setRampSeconds] = useState(60);
   const [sustainSeconds, setSustainSeconds] = useState(120);
   const [gapSeconds, setGapSeconds] = useState(30);
