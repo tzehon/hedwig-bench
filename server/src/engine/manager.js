@@ -234,6 +234,11 @@ export class RunManager {
         this._writeRateLimiter.updateRate(entry.targetWriteRPS);
         this._readRateLimiter.updateRate(entry.targetReadRPS);
 
+        // Switch read query patterns based on phase
+        // Concurrent (writes active): point reads (1 item)
+        // Isolation (writes off): list queries (50–100 items)
+        this._reader.isolationMode = entry.targetWriteRPS === 0;
+
         this._currentSecond++;
       }, 1000);
     } catch (err) {

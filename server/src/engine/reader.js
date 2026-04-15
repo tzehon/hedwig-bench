@@ -2,37 +2,14 @@
 
 const DEFAULT_CONCURRENCY = 50;
 
-/**
- * Query patterns modelled after Scylla access patterns:
- *
- *   1. Point read:       WHERE user_id = ? AND msg_id = ?
- *   2. Recent messages:  WHERE user_id = ? AND created_at > ? LIMIT ?
- *   3. Filtered inbox:   WHERE user_id = ? AND status = ? ORDER BY created_at DESC LIMIT ?
- *
- * The reader randomly selects among these weighted patterns each operation.
- */
-const QUERY_PATTERNS = [
-  { name: 'point_read', weight: 30 },
-  { name: 'recent_messages', weight: 40 },
-  { name: 'filtered_inbox', weight: 30 },
-];
-
-const TOTAL_WEIGHT = QUERY_PATTERNS.reduce((sum, p) => sum + p.weight, 0);
 const STATUSES = ['delivered', 'read', 'unread'];
 
-function pickQueryPattern() {
-  const roll = Math.floor(Math.random() * TOTAL_WEIGHT);
-  let cumulative = 0;
-  for (const pattern of QUERY_PATTERNS) {
-    cumulative += pattern.weight;
-    if (roll < cumulative) return pattern.name;
-  }
-  return QUERY_PATTERNS[QUERY_PATTERNS.length - 1].name;
-}
-
 /**
- * Read worker that queries the collection using realistic query patterns,
+ * Read worker that queries the collection using phase-aware query patterns,
  * paced by a RateLimiter.
+ *
+ * - Concurrent mode (writes active): point reads only, returning 1 item.
+ * - Isolation mode (read-only phase): list queries returning 50–100 items.
  */
 export class ReadWorker {
   /**
@@ -59,6 +36,13 @@ export class ReadWorker {
     this.latencies = [];
 
     this._concurrency = config.concurrency ?? DEFAULT_CONCURRENCY;
+
+    /**
+     * Controls query pattern selection. Set by RunManager each tick.
+     * false = concurrent (point reads, 1 item)
+     * true  = isolation (list queries, 50–100 items)
+     */
+    this.isolationMode = false;
   }
 
   /**
@@ -88,48 +72,40 @@ export class ReadWorker {
         const num = 1 + Math.floor(Math.random() * userPoolSize);
         const userId = `user_${String(num).padStart(6, '0')}`;
 
-        const pattern = pickQueryPattern();
         const start = performance.now();
 
-        switch (pattern) {
-          case 'point_read': {
-            // WHERE user_id = ? AND msg_id = ?
-            // Use a random UUID — will usually miss (simulates cache-miss reads),
-            // which is a realistic worst-case for point reads.
-            const h = '0123456789abcdef';
-            let msgId = '';
-            for (let i = 0; i < 36; i++) {
-              if (i === 8 || i === 13 || i === 18 || i === 23) msgId += '-';
-              else msgId += h[Math.floor(Math.random() * 16)];
-            }
-            await this._collection.findOne({ user_id: userId, msg_id: msgId });
-            break;
-          }
-          case 'recent_messages': {
-            // WHERE user_id = ? AND created_at > ? LIMIT 20
-            // Look for messages in the last 24 hours
-            // Project out body — list views show subjects, not full message bodies
+        if (this.isolationMode) {
+          // ── Isolation: list queries returning 50–100 items ──
+          const limit = 50 + Math.floor(Math.random() * 51); // 50–100
+
+          if (Math.random() < 0.5) {
+            // Recent messages
             const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
             await this._collection
               .find({ user_id: userId, created_at: { $gt: since } })
               .project({ body: 0 })
               .sort({ created_at: -1 })
-              .limit(20)
+              .limit(limit)
               .toArray();
-            break;
-          }
-          case 'filtered_inbox': {
-            // WHERE user_id = ? AND status = ? ORDER BY created_at DESC LIMIT 20
-            // Project out body — list views show subjects, not full message bodies
+          } else {
+            // Filtered inbox
             const status = STATUSES[Math.floor(Math.random() * STATUSES.length)];
             await this._collection
               .find({ user_id: userId, status })
               .project({ body: 0 })
               .sort({ created_at: -1 })
-              .limit(20)
+              .limit(limit)
               .toArray();
-            break;
           }
+        } else {
+          // ── Concurrent: point reads returning 1 item ──
+          const h = '0123456789abcdef';
+          let msgId = '';
+          for (let i = 0; i < 36; i++) {
+            if (i === 8 || i === 13 || i === 18 || i === 23) msgId += '-';
+            else msgId += h[Math.floor(Math.random() * 16)];
+          }
+          await this._collection.findOne({ user_id: userId, msg_id: msgId });
         }
 
         const elapsed = performance.now() - start;

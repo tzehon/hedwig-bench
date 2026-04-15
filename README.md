@@ -341,13 +341,22 @@ Fixed at the **Extended** profile (4 indexes):
 
 ### Read Query Patterns
 
-The read worker runs at a variable rate (paced by a token-bucket rate limiter that is updated each second from the schedule) and randomly selects among three query patterns:
+The read worker runs at a variable rate (paced by a token-bucket rate limiter updated each second) and switches query patterns based on the current phase:
 
-| Pattern | Weight | MongoDB Query |
-|---------|--------|---------------|
-| **Point read** | 30% | `findOne({ user_id, msg_id })` |
-| **Recent messages** | 40% | `find({ user_id, created_at: { $gt: 24h ago } }).sort({ created_at: -1 }).limit(20)` |
-| **Filtered inbox** | 30% | `find({ user_id, status }).sort({ created_at: -1 }).limit(20)` |
+**Concurrent mode** (60% of run — writes active): point reads only, returning 1 item per query.
+
+| Pattern | MongoDB Query | Items returned |
+|---------|---------------|----------------|
+| **Point read** | `findOne({ user_id, msg_id })` | 1 |
+
+**Isolation mode** (40% of run — read-only): list queries returning 50–100 items per query.
+
+| Pattern | Weight | MongoDB Query | Items returned |
+|---------|--------|---------------|----------------|
+| **Recent messages** | 50% | `find({ user_id, created_at: { $gt: 24h ago } }).project({ body: 0 }).sort({ created_at: -1 }).limit(50–100)` | 50–100 |
+| **Filtered inbox** | 50% | `find({ user_id, status }).project({ body: 0 }).sort({ created_at: -1 }).limit(50–100)` | 50–100 |
+
+List queries project out the `body` field (realistic for inbox list views). Point reads return the full document.
 
 ---
 
