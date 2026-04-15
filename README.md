@@ -141,7 +141,15 @@ Static report view after a run completes.
 **Summary cards (top row):**
 - **Configuration**: Doc size, index profile, write mode, write concern.
 - **Write Performance**: Peak write RPS, avg sustain RPS, p50/p90/p99 latency (per document).
-- **Read Performance**: Achieved read RPS, p50/p90/p99 latency (per query).
+- **Concurrent Reads**: Target vs achieved QPS with formula (e.g. `8k qps × 1 doc = 8k docs/s`), p50/p90/p99 latency.
+- **Isolation Reads**: Target vs achieved QPS with formula (e.g. `2k qps × ~30 docs = 60k docs/s`), p50/p90/p99 latency.
+
+**Read targets vs achieved table**: Shows side-by-side comparison for each phase:
+
+| Phase | Target QPS | Docs/query | Target Docs/s | Achieved QPS | Achieved Docs/s | p99 |
+|-------|-----------|------------|---------------|-------------|-----------------|-----|
+| Concurrent (60%) | 8,000 | 1 | 8,000 | actual | actual | ms |
+| Isolation (40%) | 2,000 | ~30 avg | ~60,000 | actual | actual × 30 | ms |
 
 **Full charts**: Same as the Live Dashboard but with all data and zoom/pan via Recharts Brush controls.
 

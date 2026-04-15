@@ -89,11 +89,22 @@ Go back to the home page (`/`). Your URI is still saved.
 2. Run again with the same or different settings
 3. This is more realistic: reads now query against millions of existing documents
 
+### Read performance targets
+
+The benchmark tests whether the cluster can hit these read targets:
+
+| Phase | Queries/sec | Docs/query | Docs/sec returned |
+|-------|-------------|------------|-------------------|
+| **Concurrent** (60%) | 8,000 | 1 | 8,000 |
+| **Isolation** (40%) | 2,000 | ~30 avg | ~60,000 |
+
+After a run completes, the **Results** page shows a "Read Performance: Target vs Achieved" table so you can immediately see if the cluster met the targets. Reads use `readPreference: secondaryPreferred` to distribute load across replica set members.
+
 ### Comparing constant vs variable reads
 
 To see the impact of read isolation vs concurrent-only reads:
-1. Run once in **Variable** mode (default: 40% isolation, min 3.5k / avg 5k / max 10k RPS)
-2. Run again in **Constant** mode at the same average (5,000 RPS)
+1. Run once in **Variable** mode (default: 8k concurrent, 2k isolation, 40% split)
+2. Run again in **Constant** mode at a fixed rate
 3. Go to History → compare the two runs to see latency differences
 
 ### Finding max throughput
