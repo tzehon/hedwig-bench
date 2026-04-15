@@ -59,7 +59,7 @@ export class ReadWorker {
   async seedCache() {
     try {
       const docs = await this._collection
-        .aggregate([{ $sample: { size: 5000 } }, { $project: { user_id: 1, msg_id: 1 } }])
+        .aggregate([{ $sample: { size: 50000 } }, { $project: { user_id: 1, msg_id: 1 } }])
         .toArray();
       for (const doc of docs) {
         if (doc.user_id && doc.msg_id) {
@@ -132,13 +132,18 @@ export class ReadWorker {
           }
         } else {
           // ── Concurrent: point reads returning 1 item ──
-          // Use a cached msg_id so the read hits a real document (seeded at start).
           const cachedMsgId = this._knownMsgIds.get(userId);
           if (cachedMsgId) {
             await this._collection.findOne({ user_id: userId, msg_id: cachedMsgId });
           } else {
-            // User not in cache — do an indexed lookup, cache for next time
-            await this._collection.findOne({ user_id: userId });
+            // User not in cache — find any doc, cache msg_id for next time
+            const doc = await this._collection.findOne(
+              { user_id: userId },
+              { projection: { user_id: 1, msg_id: 1 } },
+            );
+            if (doc?.msg_id) {
+              this._knownMsgIds.set(userId, doc.msg_id);
+            }
           }
         }
 
