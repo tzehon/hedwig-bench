@@ -1,4 +1,4 @@
-import { MongoClient, ReadPreference } from 'mongodb';
+import { MongoClient } from 'mongodb';
 import { RateLimiter } from './rateLimiter.js';
 import { WriteWorker } from './writer.js';
 import { ReadWorker } from './reader.js';
@@ -190,7 +190,7 @@ export class RunManager {
 
       // Read collection uses secondaryPreferred to avoid contention with writes on primary
       const readCollection = this._db.collection(this._config.collectionName, {
-        readPreference: ReadPreference.SECONDARY_PREFERRED,
+        readPreference: 'secondaryPreferred',
       });
 
       this._reader = new ReadWorker(readCollection, this._readRateLimiter, {
