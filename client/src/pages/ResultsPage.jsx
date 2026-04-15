@@ -130,11 +130,10 @@ function generateMarkdownReport(run) {
   md += `| Peak Write RPS | ${fmt(summary.peakWriteRPS, 0)} |\n`;
   md += `| Avg Write RPS | ${fmt(summary.avgWriteRPS, 0)} |\n`;
   md += `| Write p50 / p90 / p99 | ${fmt(summary.writeP50)} / ${fmt(summary.writeP90)} / ${fmt(summary.writeP99)} ms |\n`;
-  md += `| Concurrent Read RPS (1 item) | ${fmt(summary.avgConcurrentReadRPS, 0)} (target: ${fmt(config.readRPSConcurrent, 0)}) |\n`;
+  md += `| Concurrent Reads | ${fmt(summary.avgConcurrentReadRPS, 0)} qps × 1 doc = ${fmt(summary.avgConcurrentReadRPS, 0)} docs/s (target: ${fmt(config.readRPSConcurrent, 0)} qps = ${fmt(config.readRPSConcurrent, 0)} docs/s) |\n`;
   md += `| Concurrent Read p50 / p90 / p99 | ${fmt(summary.concurrentReadP50)} / ${fmt(summary.concurrentReadP90)} / ${fmt(summary.concurrentReadP99)} ms |\n`;
-  md += `| Isolation Read RPS (avg 30 items) | ${fmt(summary.avgIsolationReadRPS, 0)} (target: ${fmt(config.readRPSIsolation, 0)}) |\n`;
+  md += `| Isolation Reads | ${fmt(summary.avgIsolationReadRPS, 0)} qps × ~30 docs = ${fmt((summary.avgIsolationReadRPS || 0) * 30, 0)} docs/s (target: ${fmt(config.readRPSIsolation, 0)} qps = ${fmt((config.readRPSIsolation || 0) * 30, 0)} docs/s) |\n`;
   md += `| Isolation Read p50 / p90 / p99 | ${fmt(summary.isolationReadP50)} / ${fmt(summary.isolationReadP90)} / ${fmt(summary.isolationReadP99)} ms |\n`;
-  md += `| Isolation ~Docs/sec | ${fmt((summary.avgIsolationReadRPS || 0) * 30, 0)} |\n`;
   md += `| Error Rate | ${fmt(summary.errorRate)}% |\n`;
   md += `\n`;
 
@@ -406,14 +405,14 @@ export default function ResultsPage() {
         </SummaryCard>
 
         {/* Concurrent Read Card */}
-        <SummaryCard title="Concurrent Reads (1 item)" borderColor="#3b82f6">
+        <SummaryCard title="Concurrent Reads" borderColor="#3b82f6">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Target RPS</span>
-              <span className="text-sm text-gray-300 font-mono">{fmtRPS(config.readRPSConcurrent)}</span>
+              <span className="text-xs text-gray-400">Target</span>
+              <span className="text-sm text-gray-300 font-mono">{fmtRPS(config.readRPSConcurrent)} qps &times; 1 doc = {fmtRPS(config.readRPSConcurrent)} docs/s</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Achieved RPS</span>
+              <span className="text-xs text-gray-400">Achieved QPS</span>
               <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.avgConcurrentReadRPS)}</span>
             </div>
             <div className="flex justify-between">
@@ -432,14 +431,14 @@ export default function ResultsPage() {
         </SummaryCard>
 
         {/* Isolation Read Card */}
-        <SummaryCard title="Isolation Reads (avg 30 items)" borderColor="#a855f7">
+        <SummaryCard title="Isolation Reads" borderColor="#a855f7">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Target RPS</span>
-              <span className="text-sm text-gray-300 font-mono">{fmtRPS(config.readRPSIsolation)}</span>
+              <span className="text-xs text-gray-400">Target</span>
+              <span className="text-sm text-gray-300 font-mono">{fmtRPS(config.readRPSIsolation)} qps &times; ~30 docs = {fmtRPS((config.readRPSIsolation || 0) * 30)} docs/s</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Achieved RPS</span>
+              <span className="text-xs text-gray-400">Achieved QPS</span>
               <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.avgIsolationReadRPS)}</span>
             </div>
             <div className="flex justify-between">
@@ -453,10 +452,6 @@ export default function ResultsPage() {
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">p99</span>
               <span className="text-sm font-mono text-red-400">{fmt(summary.isolationReadP99)} ms</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-xs text-gray-400">~Docs/sec</span>
-              <span className="text-sm text-gray-200 font-mono">{fmtRPS((summary.avgIsolationReadRPS || 0) * 30)}</span>
             </div>
           </div>
         </SummaryCard>
