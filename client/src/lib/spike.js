@@ -9,14 +9,8 @@ function calcExtraReadOnlySeconds(writeScheduleTime, gapTotalSeconds, readIsolat
 
 export function generateSchedule({
   targetWriteRPS, numSpikes, rampSeconds, sustainSeconds, gapSeconds,
-  readRPSMin, readRPSMax, readRPSAvg, readIsolationPct = 0,
-  targetReadRPS,
+  readRPSConcurrent = 8000, readRPSIsolation = 2000, readIsolationPct = 0,
 }) {
-  const legacyReadRPS = targetReadRPS ?? 1500;
-  const rMin = readRPSMin ?? legacyReadRPS;
-  const rMax = readRPSMax ?? legacyReadRPS;
-  const rAvg = readRPSAvg ?? legacyReadRPS;
-
   const schedule = [];
   let t = 0;
 
@@ -25,64 +19,38 @@ export function generateSchedule({
   const writeScheduleTime = writeActiveSeconds + gapTotalSeconds;
   const extraReadOnly = calcExtraReadOnlySeconds(writeScheduleTime, gapTotalSeconds, readIsolationPct);
 
-  let concurrentReadRate;
-  if (readIsolationPct > 0) {
-    const totalTime = writeActiveSeconds + gapTotalSeconds + extraReadOnly;
-    const readOnlyAvg = (rMin + rMax) / 2;
-    concurrentReadRate = writeActiveSeconds > 0
-      ? Math.round((rAvg * totalTime - rMin * gapTotalSeconds - readOnlyAvg * extraReadOnly) / writeActiveSeconds)
-      : rAvg;
-    concurrentReadRate = Math.max(rMin, Math.min(rMax, concurrentReadRate));
-  } else {
-    concurrentReadRate = rAvg;
-  }
+  const concurrentRate = readRPSConcurrent;
+  const isolationRate = readRPSIsolation;
 
   for (let spike = 0; spike < numSpikes; spike++) {
     for (let s = 0; s < rampSeconds; s++) {
       schedule.push({
         second: t++,
         targetWriteRPS: targetWriteRPS * (s / rampSeconds),
-        targetReadRPS: concurrentReadRate,
+        targetReadRPS: concurrentRate,
       });
     }
     for (let s = 0; s < sustainSeconds; s++) {
-      schedule.push({ second: t++, targetWriteRPS, targetReadRPS: concurrentReadRate });
+      schedule.push({ second: t++, targetWriteRPS, targetReadRPS: concurrentRate });
     }
     for (let s = 0; s < 60; s++) {
       schedule.push({
         second: t++,
         targetWriteRPS: targetWriteRPS * (1 - s / 60),
-        targetReadRPS: concurrentReadRate,
+        targetReadRPS: concurrentRate,
       });
     }
     if (spike < numSpikes - 1) {
       for (let s = 0; s < gapSeconds; s++) {
-        schedule.push({
-          second: t++,
-          targetWriteRPS: 0,
-          targetReadRPS: readIsolationPct > 0 ? rMin : concurrentReadRate,
-        });
+        schedule.push({ second: t++, targetWriteRPS: 0, targetReadRPS: isolationRate });
       }
     }
   }
 
-  // Read-only isolation phase (triangle: min → max → min)
+  // Read-only isolation phase (flat rate)
   if (extraReadOnly > 0) {
-    const half = Math.floor(extraReadOnly / 2);
-    for (let s = 0; s < half; s++) {
-      schedule.push({
-        second: t++,
-        targetWriteRPS: 0,
-        targetReadRPS: rMin + (rMax - rMin) * (s / Math.max(1, half)),
-      });
-    }
-    const remaining = extraReadOnly - half;
-    for (let s = 0; s < remaining; s++) {
-      schedule.push({
-        second: t++,
-        targetWriteRPS: 0,
-        targetReadRPS: rMax - (rMax - rMin) * (s / Math.max(1, remaining)),
-      });
+    for (let s = 0; s < extraReadOnly; s++) {
+      schedule.push({ second: t++, targetWriteRPS: 0, targetReadRPS: isolationRate });
     }
   }
 

@@ -2,11 +2,6 @@ const COOLDOWN_SECONDS = 60;
 
 /**
  * Calculate the extra read-only seconds needed to achieve the desired isolation percentage.
- *
- * @param {number} writeScheduleTime - Total seconds in the write schedule
- * @param {number} gapTotalSeconds   - Seconds that are already isolation (gaps between spikes)
- * @param {number} readIsolationPct  - Desired isolation percentage (0-100)
- * @returns {number} Extra read-only seconds to append
  */
 function calcExtraReadOnlySeconds(writeScheduleTime, gapTotalSeconds, readIsolationPct) {
   if (readIsolationPct <= 0) return 0;
@@ -16,29 +11,47 @@ function calcExtraReadOnlySeconds(writeScheduleTime, gapTotalSeconds, readIsolat
 }
 
 /**
- * Calculate the concurrent read rate (during write-active phases) that satisfies the
- * target average read RPS across the entire run.
+ * Resolve read rates from config.
  *
- * @param {object} params
- * @param {number} params.readRPSAvg       - Target average read RPS
- * @param {number} params.readRPSMin       - Minimum read RPS (used during gaps)
- * @param {number} params.readRPSMax       - Maximum read RPS (peak during isolation)
- * @param {number} params.writeActiveSeconds - Seconds where writes are active
- * @param {number} params.gapTotalSeconds    - Seconds of gaps (reads at min)
- * @param {number} params.extraReadOnly      - Extra read-only seconds (triangle pattern)
- * @returns {number} Concurrent read rate (clamped to [min, max])
+ * Supports two modes:
+ *   1. Direct: readRPSConcurrent + readRPSIsolation (preferred, used by current UI)
+ *   2. Legacy: readRPSMin + readRPSMax + readRPSAvg (auto-computes concurrent rate)
+ *
+ * @returns {{ concurrentRate: number, isolationRate: number }}
  */
-function calcConcurrentReadRate({ readRPSAvg, readRPSMin, readRPSMax, writeActiveSeconds, gapTotalSeconds, extraReadOnly }) {
+function resolveReadRates(config, writeActiveSeconds, gapTotalSeconds, extraReadOnly) {
+  const readIsolationPct = config.readIsolationPct ?? 0;
+
+  // Direct mode: explicit concurrent and isolation rates
+  if (config.readRPSConcurrent != null && config.readRPSIsolation != null) {
+    return {
+      concurrentRate: config.readRPSConcurrent,
+      isolationRate: config.readRPSIsolation,
+    };
+  }
+
+  // Legacy mode: compute from min/avg/max
+  const legacyReadRPS = config.targetReadRPS ?? config.readRPS ?? 1500;
+  const readRPSMin = config.readRPSMin ?? legacyReadRPS;
+  const readRPSMax = config.readRPSMax ?? legacyReadRPS;
+  const readRPSAvg = config.readRPSAvg ?? legacyReadRPS;
+
+  if (readIsolationPct <= 0) {
+    return { concurrentRate: readRPSAvg, isolationRate: readRPSAvg };
+  }
+
   const totalTime = writeActiveSeconds + gapTotalSeconds + extraReadOnly;
-  if (totalTime === 0 || writeActiveSeconds === 0) return readRPSAvg;
+  const isolationRate = (readRPSMin + readRPSMax) / 2;
 
-  // Triangle (min → max → min) has average = (min + max) / 2
-  const readOnlyAvg = (readRPSMin + readRPSMax) / 2;
+  let concurrentRate = readRPSAvg;
+  if (writeActiveSeconds > 0 && totalTime > 0) {
+    concurrentRate = Math.round(
+      (readRPSAvg * totalTime - readRPSMin * gapTotalSeconds - isolationRate * extraReadOnly) / writeActiveSeconds,
+    );
+    concurrentRate = Math.max(readRPSMin, Math.min(readRPSMax, concurrentRate));
+  }
 
-  const rate = Math.round(
-    (readRPSAvg * totalTime - readRPSMin * gapTotalSeconds - readOnlyAvg * extraReadOnly) / writeActiveSeconds,
-  );
-  return Math.max(readRPSMin, Math.min(readRPSMax, rate));
+  return { concurrentRate, isolationRate };
 }
 
 /**
@@ -50,23 +63,14 @@ function calcConcurrentReadRate({ readRPSAvg, readRPSMin, readRPSMax, writeActiv
  * @param {number} config.rampSeconds      - Seconds to ramp from 0 to target
  * @param {number} config.sustainSeconds   - Seconds to hold at target
  * @param {number} config.gapSeconds       - Seconds of silence between spikes
- * @param {number} [config.readRPSMin]     - Minimum read RPS (default: falls back to targetReadRPS or 1500)
- * @param {number} [config.readRPSMax]     - Maximum read RPS (default: same as min for constant rate)
- * @param {number} [config.readRPSAvg]     - Target average read RPS (default: same as min)
- * @param {number} [config.readIsolationPct] - Percentage of run time that should be read-only (0-100, default: 0)
- * @param {number} [config.targetReadRPS]  - Legacy: constant read RPS (used as fallback)
- * @param {number} [config.readRPS]        - Legacy alias for targetReadRPS
+ * @param {number} [config.readRPSConcurrent] - Read RPS during write-active phases (preferred)
+ * @param {number} [config.readRPSIsolation]  - Read RPS during read-only phase (preferred)
+ * @param {number} [config.readIsolationPct]  - Percentage of run time that is read-only (0-100)
  * @returns {Array<{ second: number, targetWriteRPS: number, targetReadRPS: number }>}
  */
 export function generateSchedule(config) {
   const { targetWriteRPS, numSpikes, rampSeconds, sustainSeconds, gapSeconds } = config;
-
-  // Read config — backward-compatible: if no new params, use constant rate
   const readIsolationPct = config.readIsolationPct ?? 0;
-  const legacyReadRPS = config.targetReadRPS ?? config.readRPS ?? 1500;
-  const readRPSMin = config.readRPSMin ?? legacyReadRPS;
-  const readRPSMax = config.readRPSMax ?? legacyReadRPS;
-  const readRPSAvg = config.readRPSAvg ?? legacyReadRPS;
 
   const schedule = [];
   let second = 0;
@@ -75,76 +79,50 @@ export function generateSchedule(config) {
   const writeActiveSeconds = numSpikes * (rampSeconds + sustainSeconds + COOLDOWN_SECONDS);
   const gapTotalSeconds = Math.max(0, numSpikes - 1) * gapSeconds;
   const writeScheduleTime = writeActiveSeconds + gapTotalSeconds;
-
   const extraReadOnly = calcExtraReadOnlySeconds(writeScheduleTime, gapTotalSeconds, readIsolationPct);
 
-  // Determine read rate during concurrent (write-active) phases
-  let concurrentReadRate;
-  if (readIsolationPct > 0) {
-    concurrentReadRate = calcConcurrentReadRate({
-      readRPSAvg,
-      readRPSMin,
-      readRPSMax,
-      writeActiveSeconds,
-      gapTotalSeconds,
-      extraReadOnly,
-    });
-  } else {
-    // No isolation — constant read rate everywhere
-    concurrentReadRate = readRPSAvg;
-  }
+  // Resolve read rates
+  const { concurrentRate, isolationRate } = resolveReadRates(
+    config, writeActiveSeconds, gapTotalSeconds, extraReadOnly,
+  );
 
   // ── Write spike phases ──
   for (let spike = 0; spike < numSpikes; spike++) {
-    // Ramp: linear 0 -> target over rampSeconds
+    // Ramp
     for (let s = 0; s < rampSeconds; s++) {
       const rps = rampSeconds > 0
         ? Math.round(targetWriteRPS * (s / rampSeconds))
         : targetWriteRPS;
-      schedule.push({ second, targetWriteRPS: rps, targetReadRPS: concurrentReadRate });
+      schedule.push({ second, targetWriteRPS: rps, targetReadRPS: concurrentRate });
       second++;
     }
 
-    // Sustain: hold at target for sustainSeconds
+    // Sustain
     for (let s = 0; s < sustainSeconds; s++) {
-      schedule.push({ second, targetWriteRPS, targetReadRPS: concurrentReadRate });
+      schedule.push({ second, targetWriteRPS, targetReadRPS: concurrentRate });
       second++;
     }
 
-    // Cooldown: linear target -> 0 over 60s
+    // Cooldown
     for (let s = 0; s < COOLDOWN_SECONDS; s++) {
       const rps = Math.round(targetWriteRPS * (1 - (s + 1) / COOLDOWN_SECONDS));
-      schedule.push({ second, targetWriteRPS: rps, targetReadRPS: concurrentReadRate });
+      schedule.push({ second, targetWriteRPS: rps, targetReadRPS: concurrentRate });
       second++;
     }
 
-    // Gap: silence between spikes (skip after last spike)
+    // Gap
     if (spike < numSpikes - 1) {
       for (let s = 0; s < gapSeconds; s++) {
-        schedule.push({
-          second,
-          targetWriteRPS: 0,
-          targetReadRPS: readIsolationPct > 0 ? readRPSMin : concurrentReadRate,
-        });
+        schedule.push({ second, targetWriteRPS: 0, targetReadRPS: isolationRate });
         second++;
       }
     }
   }
 
-  // ── Read-only isolation phase (triangle: min → max → min) ──
+  // ── Read-only isolation phase (flat rate) ──
   if (extraReadOnly > 0) {
-    const halfReadOnly = Math.floor(extraReadOnly / 2);
-    // Ramp up: min → max
-    for (let s = 0; s < halfReadOnly; s++) {
-      const rps = Math.round(readRPSMin + (readRPSMax - readRPSMin) * (s / Math.max(1, halfReadOnly)));
-      schedule.push({ second, targetWriteRPS: 0, targetReadRPS: rps });
-      second++;
-    }
-    // Ramp down: max → min
-    const remaining = extraReadOnly - halfReadOnly;
-    for (let s = 0; s < remaining; s++) {
-      const rps = Math.round(readRPSMax - (readRPSMax - readRPSMin) * (s / Math.max(1, remaining)));
-      schedule.push({ second, targetWriteRPS: 0, targetReadRPS: rps });
+    for (let s = 0; s < extraReadOnly; s++) {
+      schedule.push({ second, targetWriteRPS: 0, targetReadRPS: isolationRate });
       second++;
     }
   }
@@ -155,9 +133,6 @@ export function generateSchedule(config) {
 /**
  * Compute total duration in seconds for a given spike config,
  * including the read-only isolation phase if configured.
- *
- * @param {object} config - Same shape as generateSchedule config
- * @returns {number} Total seconds the run will last
  */
 export function getTotalDurationSeconds(config) {
   const { numSpikes, rampSeconds, sustainSeconds, gapSeconds } = config;

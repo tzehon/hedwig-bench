@@ -117,7 +117,8 @@ function generateMarkdownReport(run) {
   md += `| Write Mode | ${config.writeMode || '--'} |\n`;
   md += `| Write Concern | ${config.writeConcern || '--'} |\n`;
   md += `| Target Write RPS | ${fmt(config.targetWriteRPS, 0)} |\n`;
-  md += `| Read RPS (min/avg/max) | ${fmt(config.readRPSMin, 0)} / ${fmt(config.readRPSAvg, 0)} / ${fmt(config.readRPSMax, 0)} |\n`;
+  md += `| Concurrent Read RPS | ${fmt(config.readRPSConcurrent, 0)} |\n`;
+  md += `| Isolation Read RPS | ${fmt(config.readRPSIsolation, 0)} |\n`;
   md += `| Read Isolation | ${config.readIsolationPct || 0}% |\n`;
   md += `| Spikes | ${config.numSpikes || '--'} |\n`;
   md += `\n`;
@@ -432,10 +433,12 @@ export default function ResultsPage() {
         <SummaryCard title="Read Configuration" borderColor="#6B7280">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Target RPS (min/avg/max)</span>
-              <span className="text-sm text-gray-200 font-mono">
-                {fmtRPS(config.readRPSMin)} / {fmtRPS(config.readRPSAvg)} / {fmtRPS(config.readRPSMax)}
-              </span>
+              <span className="text-xs text-gray-400">Concurrent RPS</span>
+              <span className="text-sm text-gray-200 font-mono">{fmtRPS(config.readRPSConcurrent)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">Isolation RPS</span>
+              <span className="text-sm text-gray-200 font-mono">{fmtRPS(config.readRPSIsolation)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">Isolation</span>

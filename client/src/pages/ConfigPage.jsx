@@ -106,16 +106,15 @@ function EyeIcon({ open }) {
 // ---------------------------------------------------------------------------
 // Spike SVG Preview
 // ---------------------------------------------------------------------------
-function SpikePreview({ targetWriteRPS, numSpikes, rampSeconds, sustainSeconds, gapSeconds, readRPSMin, readRPSMax, readRPSAvg, readIsolationPct }) {
+function SpikePreview({ targetWriteRPS, numSpikes, rampSeconds, sustainSeconds, gapSeconds, readRPSConcurrent, readRPSIsolation, readIsolationPct }) {
   const schedule = generateSchedule({
     targetWriteRPS,
     numSpikes,
     rampSeconds,
     sustainSeconds,
     gapSeconds,
-    readRPSMin,
-    readRPSMax,
-    readRPSAvg,
+    readRPSConcurrent,
+    readRPSIsolation,
     readIsolationPct,
   });
 
@@ -128,7 +127,7 @@ function SpikePreview({ targetWriteRPS, numSpikes, rampSeconds, sustainSeconds, 
   const plotH = svgH - pad.top - pad.bottom;
 
   const maxT = schedule[schedule.length - 1].second;
-  const maxRPS = Math.max(targetWriteRPS || 1, readRPSMax || 1);
+  const maxRPS = Math.max(targetWriteRPS || 1, readRPSConcurrent || 1, readRPSIsolation || 1);
 
   const xScale = (s) => pad.left + (s / (maxT || 1)) * plotW;
   const yScale = (rps) => pad.top + plotH - (rps / maxRPS) * plotH;
@@ -283,9 +282,8 @@ export default function ConfigPage() {
 
   // -- Read Config --
   const [readMode, setReadMode] = useState('variable'); // 'constant' | 'variable'
-  const [readRPSMin, setReadRPSMin] = useState(3500);
-  const [readRPSMax, setReadRPSMax] = useState(10000);
-  const [readRPSAvg, setReadRPSAvg] = useState(5000);
+  const [readRPSConcurrent, setReadRPSConcurrent] = useState(8000);
+  const [readRPSIsolation, setReadRPSIsolation] = useState(2000);
   const [readIsolationPct, setReadIsolationPct] = useState(40);
   const [readLanes, setReadLanes] = useState(150);
 
@@ -342,9 +340,8 @@ export default function ConfigPage() {
       writeConcern,
       uncapped,
       writeConcurrency: writeLanes,
-      readRPSMin,
-      readRPSMax,
-      readRPSAvg,
+      readRPSConcurrent,
+      readRPSIsolation,
       readIsolationPct,
       readConcurrency: readLanes,
       numSpikes,
@@ -358,7 +355,7 @@ export default function ConfigPage() {
     [
       runName, mongoUri, dbName, collectionName, poolSize, docSize, userPoolSize,
       indexProfile, writeMode, batchSize, targetWriteRPS, writeConcern, uncapped, writeLanes,
-      readRPSMin, readRPSMax, readRPSAvg, readIsolationPct, readLanes,
+      readRPSConcurrent, readRPSIsolation, readIsolationPct, readLanes,
       numSpikes, rampSeconds, sustainSeconds, gapSeconds,
       dropMode,
     ],
@@ -403,9 +400,8 @@ export default function ConfigPage() {
     setNumSpikes(1);
     setTargetWriteRPS(5000);
     setReadMode('constant');
-    setReadRPSMin(500);
-    setReadRPSMax(500);
-    setReadRPSAvg(500);
+    setReadRPSConcurrent(500);
+    setReadRPSIsolation(500);
     setReadIsolationPct(0);
     setRampSeconds(10);
     setSustainSeconds(30);
@@ -417,9 +413,8 @@ export default function ConfigPage() {
       handleStart({
         numSpikes: 1,
         targetWriteRPS: 5000,
-        readRPSMin: 500,
-        readRPSMax: 500,
-        readRPSAvg: 500,
+        readRPSConcurrent: 500,
+        readRPSIsolation: 500,
         readIsolationPct: 0,
         rampSeconds: 10,
         sustainSeconds: 30,
@@ -688,12 +683,11 @@ export default function ConfigPage() {
           /* Constant mode: single slider */
           <RangeSlider
             id="readRPSConstant"
-            value={readRPSAvg}
+            value={readRPSConcurrent}
             onChange={(e) => {
               const v = Number(e.target.value);
-              setReadRPSAvg(v);
-              setReadRPSMin(v);
-              setReadRPSMax(v);
+              setReadRPSConcurrent(v);
+              setReadRPSIsolation(v);
               setReadIsolationPct(0);
             }}
             min={100}
@@ -702,35 +696,26 @@ export default function ConfigPage() {
             label="Target read RPS"
           />
         ) : (
-          /* Variable mode: min/avg/max + isolation */
+          /* Variable mode: concurrent + isolation rates */
           <>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <RangeSlider
-                id="readRPSMin"
-                value={readRPSMin}
-                onChange={(e) => setReadRPSMin(Math.min(Number(e.target.value), readRPSAvg))}
-                min={100}
-                max={15000}
-                step={100}
-                label="Min read RPS"
-              />
-              <RangeSlider
-                id="readRPSAvg"
-                value={readRPSAvg}
-                onChange={(e) => setReadRPSAvg(Number(e.target.value))}
-                min={100}
-                max={15000}
-                step={100}
-                label="Avg read RPS"
-              />
-              <RangeSlider
-                id="readRPSMax"
-                value={readRPSMax}
-                onChange={(e) => setReadRPSMax(Math.max(Number(e.target.value), readRPSAvg))}
+                id="readRPSConcurrent"
+                value={readRPSConcurrent}
+                onChange={(e) => setReadRPSConcurrent(Number(e.target.value))}
                 min={100}
                 max={20000}
                 step={100}
-                label="Max read RPS"
+                label="Concurrent read RPS (with writes)"
+              />
+              <RangeSlider
+                id="readRPSIsolation"
+                value={readRPSIsolation}
+                onChange={(e) => setReadRPSIsolation(Number(e.target.value))}
+                min={100}
+                max={20000}
+                step={100}
+                label="Isolation read RPS (read-only)"
               />
             </div>
 
@@ -746,8 +731,8 @@ export default function ConfigPage() {
             />
             {readIsolationPct > 0 && (
               <p className="text-xs text-gray-500">
-                {readIsolationPct}% of the run will be read-only (no concurrent writes).
-                A read spike (triangle: {readRPSMin.toLocaleString()} &rarr; {readRPSMax.toLocaleString()} &rarr; {readRPSMin.toLocaleString()}) runs during the isolation phase.
+                {100 - readIsolationPct}% concurrent at {readRPSConcurrent.toLocaleString()} RPS (point reads, 1 item) +{' '}
+                {readIsolationPct}% isolation at {readRPSIsolation.toLocaleString()} RPS (list queries, 1&ndash;50 items).
               </p>
             )}
           </>
@@ -826,9 +811,8 @@ export default function ConfigPage() {
             rampSeconds={rampSeconds}
             sustainSeconds={sustainSeconds}
             gapSeconds={gapSeconds}
-            readRPSMin={readRPSMin}
-            readRPSMax={readRPSMax}
-            readRPSAvg={readRPSAvg}
+            readRPSConcurrent={readRPSConcurrent}
+            readRPSIsolation={readRPSIsolation}
             readIsolationPct={readIsolationPct}
           />
         </div>

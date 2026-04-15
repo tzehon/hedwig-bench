@@ -9,7 +9,7 @@ const STATUSES = ['delivered', 'read', 'unread'];
  * paced by a RateLimiter.
  *
  * - Concurrent mode (writes active): point reads only, returning 1 item.
- * - Isolation mode (read-only phase): list queries returning 50–100 items.
+ * - Isolation mode (read-only phase): list queries returning 10–50 items (avg ~30).
  */
 export class ReadWorker {
   /**
@@ -101,8 +101,8 @@ export class ReadWorker {
         const start = performance.now();
 
         if (this.isolationMode) {
-          // ── Isolation: list queries returning 50–100 items ──
-          const limit = 50 + Math.floor(Math.random() * 51); // 50–100
+          // ── Isolation: list queries returning 10–50 items (avg ~30) ──
+          const limit = 10 + Math.floor(Math.random() * 41); // 10–50
           let results;
 
           if (Math.random() < 0.5) {

@@ -66,9 +66,8 @@ Go back to the home page (`/`). Your URI is still saved.
 | Target write RPS | 35,000 | Hedwig peak write rate |
 | Write concern | w:majority | Fixed — matches production durability |
 | Read mode | Variable | Variable for realistic patterns; Constant for a simple baseline |
-| Min read RPS | 3,500 | Floor during gaps and isolation ramp |
-| Avg read RPS | 5,000 | Target average read rate across the run |
-| Max read RPS | 10,000 | Peak during the read isolation spike |
+| Concurrent read RPS | 8,000 | Point reads during write-active phases (1 item) |
+| Isolation read RPS | 2,000 | List queries during read-only phase (10–50 items, avg ~30) |
 | Read isolation | 40% | 40% of run is read-only, 60% concurrent with writes |
 | Read lanes | 50 | Increase if reads can't keep up at high RPS |
 | Spikes | 2 | Simulates multiple campaign blasts |

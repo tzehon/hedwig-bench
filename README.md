@@ -214,10 +214,9 @@ For each query, the results show:
 | Write | Target peak RPS | `35,000` | 1,000–50,000 | Peak write ops/sec during sustain |
 | Write | Write concern | `w:majority` | — | Fixed at `w:majority` |
 | Write | Uncapped mode | `off` | on / off | Skip rate limiter to find max throughput |
-| Read | Mode | `variable` | `constant` / `variable` | **Constant**: fixed rate, concurrent with writes (legacy). **Variable**: rate varies between min/max with a read-only isolation phase. |
-| Read | Min RPS | `3,500` | 100–15,000 | Variable mode: minimum read ops/sec (floor during gaps & isolation ramp) |
-| Read | Avg RPS | `5,000` | 100–15,000 | Variable mode: target average read ops/sec across the entire run |
-| Read | Max RPS | `10,000` | 100–20,000 | Variable mode: peak read ops/sec (apex of isolation spike) |
+| Read | Mode | `variable` | `constant` / `variable` | **Constant**: fixed rate, concurrent with writes (baseline). **Variable**: different rates for concurrent vs isolation phases. |
+| Read | Concurrent RPS | `8,000` | 100–20,000 | Variable mode: read ops/sec during write-active phases (point reads, 1 item) |
+| Read | Isolation RPS | `2,000` | 100–20,000 | Variable mode: read ops/sec during read-only phase (list queries, 10–50 items, avg ~30) |
 | Read | Isolation % | `40` | 0–80 | Variable mode: percentage of total run time that is read-only (no concurrent writes) |
 | Read | Concurrency (lanes) | `50` | 1–500 | Concurrent read lanes. Increase for high RPS targets (>5k) or high-latency setups. |
 | Spike | Number of spikes | `2` | 1–10 | How many write spikes |
@@ -349,12 +348,12 @@ The read worker runs at a variable rate (paced by a token-bucket rate limiter up
 |---------|---------------|----------------|
 | **Point read** | `findOne({ user_id, msg_id })` | 1 |
 
-**Isolation mode** (40% of run — read-only): list queries returning 50–100 items per query.
+**Isolation mode** (40% of run — read-only, 2k RPS): list queries returning 10–50 items (avg ~30) per query.
 
 | Pattern | Weight | MongoDB Query | Items returned |
 |---------|--------|---------------|----------------|
-| **Recent messages** | 50% | `find({ user_id, created_at: { $gt: 24h ago } }).project({ body: 0 }).sort({ created_at: -1 }).limit(50–100)` | 50–100 |
-| **Filtered inbox** | 50% | `find({ user_id, status }).project({ body: 0 }).sort({ created_at: -1 }).limit(50–100)` | 50–100 |
+| **Recent messages** | 50% | `find({ user_id, created_at: { $gt: 24h ago } }).project({ body: 0 }).sort({ created_at: -1 }).limit(10–50)` | 10–50 |
+| **Filtered inbox** | 50% | `find({ user_id, status }).project({ body: 0 }).sort({ created_at: -1 }).limit(10–50)` | 10–50 |
 
 List queries project out the `body` field (realistic for inbox list views). Point reads return the full document.
 
