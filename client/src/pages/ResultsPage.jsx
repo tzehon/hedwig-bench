@@ -130,9 +130,11 @@ function generateMarkdownReport(run) {
   md += `| Peak Write RPS | ${fmt(summary.peakWriteRPS, 0)} |\n`;
   md += `| Avg Write RPS | ${fmt(summary.avgWriteRPS, 0)} |\n`;
   md += `| Write p50 / p90 / p99 | ${fmt(summary.writeP50)} / ${fmt(summary.writeP90)} / ${fmt(summary.writeP99)} ms |\n`;
-  md += `| Peak Read RPS | ${fmt(summary.peakReadRPS, 0)} |\n`;
-  md += `| Avg Read RPS | ${fmt(summary.avgReadRPS, 0)} |\n`;
-  md += `| Read p50 / p90 / p99 | ${fmt(summary.readP50)} / ${fmt(summary.readP90)} / ${fmt(summary.readP99)} ms |\n`;
+  md += `| Concurrent Read RPS (1 item) | ${fmt(summary.avgConcurrentReadRPS, 0)} (target: ${fmt(config.readRPSConcurrent, 0)}) |\n`;
+  md += `| Concurrent Read p50 / p90 / p99 | ${fmt(summary.concurrentReadP50)} / ${fmt(summary.concurrentReadP90)} / ${fmt(summary.concurrentReadP99)} ms |\n`;
+  md += `| Isolation Read RPS (avg 30 items) | ${fmt(summary.avgIsolationReadRPS, 0)} (target: ${fmt(config.readRPSIsolation, 0)}) |\n`;
+  md += `| Isolation Read p50 / p90 / p99 | ${fmt(summary.isolationReadP50)} / ${fmt(summary.isolationReadP90)} / ${fmt(summary.isolationReadP99)} ms |\n`;
+  md += `| Isolation ~Docs/sec | ${fmt((summary.avgIsolationReadRPS || 0) * 30, 0)} |\n`;
   md += `| Error Rate | ${fmt(summary.errorRate)}% |\n`;
   md += `\n`;
 
@@ -354,7 +356,7 @@ export default function ResultsPage() {
       {/* ============================================================= */}
       {/* Summary Cards                                                  */}
       {/* ============================================================= */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         {/* Config Card */}
         <SummaryCard title="Configuration" borderColor="#6B7280">
           <div className="space-y-2">
@@ -403,56 +405,58 @@ export default function ResultsPage() {
           </div>
         </SummaryCard>
 
-        {/* Read Performance Card */}
-        <SummaryCard title="Read Performance" borderColor="#6B7280">
+        {/* Concurrent Read Card */}
+        <SummaryCard title="Concurrent Reads (1 item)" borderColor="#3b82f6">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Peak Read RPS</span>
-              <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.peakReadRPS)}</span>
+              <span className="text-xs text-gray-400">Target RPS</span>
+              <span className="text-sm text-gray-300 font-mono">{fmtRPS(config.readRPSConcurrent)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Avg Read RPS</span>
-              <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.avgReadRPS)}</span>
+              <span className="text-xs text-gray-400">Achieved RPS</span>
+              <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.avgConcurrentReadRPS)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">p50</span>
-              <span className="text-sm font-mono text-green-400">{fmt(summary.readP50)} ms</span>
+              <span className="text-sm font-mono text-green-400">{fmt(summary.concurrentReadP50)} ms</span>
             </div>
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">p90</span>
-              <span className="text-sm font-mono text-yellow-400">{fmt(summary.readP90)} ms</span>
+              <span className="text-sm font-mono text-yellow-400">{fmt(summary.concurrentReadP90)} ms</span>
             </div>
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">p99</span>
-              <span className="text-sm font-mono text-red-400">{fmt(summary.readP99)} ms</span>
+              <span className="text-sm font-mono text-red-400">{fmt(summary.concurrentReadP99)} ms</span>
             </div>
           </div>
         </SummaryCard>
 
-        {/* Read Config Card */}
-        <SummaryCard title="Read Configuration" borderColor="#6B7280">
+        {/* Isolation Read Card */}
+        <SummaryCard title="Isolation Reads (avg 30 items)" borderColor="#a855f7">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Concurrent RPS</span>
-              <span className="text-sm text-gray-200 font-mono">{fmtRPS(config.readRPSConcurrent)}</span>
+              <span className="text-xs text-gray-400">Target RPS</span>
+              <span className="text-sm text-gray-300 font-mono">{fmtRPS(config.readRPSIsolation)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Isolation RPS</span>
-              <span className="text-sm text-gray-200 font-mono">{fmtRPS(config.readRPSIsolation)}</span>
+              <span className="text-xs text-gray-400">Achieved RPS</span>
+              <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.avgIsolationReadRPS)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Isolation</span>
-              <span className="text-sm text-gray-200 font-mono">{config.readIsolationPct || 0}%</span>
+              <span className="text-xs text-gray-400">p50</span>
+              <span className="text-sm font-mono text-green-400">{fmt(summary.isolationReadP50)} ms</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Total Read Ops</span>
-              <span className="text-sm text-gray-200 font-mono">{(summary.totalReadOps || 0).toLocaleString()}</span>
+              <span className="text-xs text-gray-400">p90</span>
+              <span className="text-sm font-mono text-yellow-400">{fmt(summary.isolationReadP90)} ms</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Read Errors</span>
-              <span className={`text-sm font-mono ${(summary.totalReadErrors || 0) > 0 ? 'text-red-400' : 'text-gray-200'}`}>
-                {(summary.totalReadErrors || 0).toLocaleString()}
-              </span>
+              <span className="text-xs text-gray-400">p99</span>
+              <span className="text-sm font-mono text-red-400">{fmt(summary.isolationReadP99)} ms</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">~Docs/sec</span>
+              <span className="text-sm text-gray-200 font-mono">{fmtRPS((summary.avgIsolationReadRPS || 0) * 30)}</span>
             </div>
           </div>
         </SummaryCard>

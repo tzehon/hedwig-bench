@@ -125,10 +125,13 @@ function computeSummary(timeseries, config) {
   const sustainWriteOps = [];
   const sustainWriteP50s = [];
   const sustainWriteP99s = [];
-  // Read metrics across sustain + read_only phases
-  const readPhaseOps = [];
-  const readPhaseP50s = [];
-  const readPhaseP99s = [];
+  // Read metrics split by concurrent (sustain) vs isolation (read_only)
+  const concurrentReadOps = [];
+  const concurrentReadP50s = [];
+  const concurrentReadP99s = [];
+  const isolationReadOps = [];
+  const isolationReadP50s = [];
+  const isolationReadP99s = [];
 
   // Per-spike accumulators
   const numSpikes = config.numSpikes || 1;
@@ -167,11 +170,16 @@ function computeSummary(timeseries, config) {
       sustainWriteP99s.push(writeP99);
     }
 
-    // Read metrics: aggregate from sustain + read_only phases
-    if (phase === 'sustain' || phase === 'read_only') {
-      readPhaseOps.push(readOps);
-      readPhaseP50s.push(readP50);
-      readPhaseP99s.push(readP99);
+    // Read metrics split by phase
+    if (phase === 'sustain' || phase === 'ramp' || phase === 'cooldown') {
+      concurrentReadOps.push(readOps);
+      concurrentReadP50s.push(readP50);
+      concurrentReadP99s.push(readP99);
+    }
+    if (phase === 'read_only') {
+      isolationReadOps.push(readOps);
+      isolationReadP50s.push(readP50);
+      isolationReadP99s.push(readP99);
     }
 
     // Per-spike aggregation
@@ -190,17 +198,23 @@ function computeSummary(timeseries, config) {
     ? sustainWriteOps.reduce((a, b) => a + b, 0) / sustainWriteOps.length
     : 0;
 
-  const avgReadRPS = readPhaseOps.length > 0
-    ? readPhaseOps.reduce((a, b) => a + b, 0) / readPhaseOps.length
+  const avgConcurrentReadRPS = concurrentReadOps.length > 0
+    ? concurrentReadOps.reduce((a, b) => a + b, 0) / concurrentReadOps.length
+    : 0;
+  const avgIsolationReadRPS = isolationReadOps.length > 0
+    ? isolationReadOps.reduce((a, b) => a + b, 0) / isolationReadOps.length
     : 0;
 
-  // Percentiles across all sustain-phase seconds
+  // Percentiles
   const writeP50 = computePercentile(sustainWriteP50s, 50);
   const writeP90 = computePercentile(sustainWriteP99s, 90);
   const writeP99 = computePercentile(sustainWriteP99s, 99);
-  const readP50 = computePercentile(readPhaseP50s, 50);
-  const readP90 = computePercentile(readPhaseP99s, 90);
-  const readP99 = computePercentile(readPhaseP99s, 99);
+  const concReadP50 = computePercentile(concurrentReadP50s, 50);
+  const concReadP90 = computePercentile(concurrentReadP99s, 90);
+  const concReadP99 = computePercentile(concurrentReadP99s, 99);
+  const isoReadP50 = computePercentile(isolationReadP50s, 50);
+  const isoReadP90 = computePercentile(isolationReadP99s, 90);
+  const isoReadP99 = computePercentile(isolationReadP99s, 99);
 
   const totalOps = totalWriteOps + totalReadOps;
   const totalErrors = totalWriteErrors + totalReadErrors;
@@ -218,17 +232,32 @@ function computeSummary(timeseries, config) {
     errorCount: spike.errorCount,
   }));
 
+  const r = (v) => Math.round(v * 100) / 100;
   return {
     peakWriteRPS,
     peakReadRPS,
-    avgWriteRPS: Math.round(avgWriteRPS * 100) / 100,
-    avgReadRPS: Math.round(avgReadRPS * 100) / 100,
-    writeP50: Math.round(writeP50 * 100) / 100,
-    writeP90: Math.round(writeP90 * 100) / 100,
-    writeP99: Math.round(writeP99 * 100) / 100,
-    readP50: Math.round(readP50 * 100) / 100,
-    readP90: Math.round(readP90 * 100) / 100,
-    readP99: Math.round(readP99 * 100) / 100,
+    avgWriteRPS: r(avgWriteRPS),
+    // Concurrent reads (point reads, 1 item, during writes)
+    avgConcurrentReadRPS: r(avgConcurrentReadRPS),
+    concurrentReadP50: r(concReadP50),
+    concurrentReadP90: r(concReadP90),
+    concurrentReadP99: r(concReadP99),
+    // Isolation reads (list queries, 10-50 items, no writes)
+    avgIsolationReadRPS: r(avgIsolationReadRPS),
+    isolationReadP50: r(isoReadP50),
+    isolationReadP90: r(isoReadP90),
+    isolationReadP99: r(isoReadP99),
+    // Backward compat: combined read metrics
+    avgReadRPS: r(avgConcurrentReadRPS + avgIsolationReadRPS > 0
+      ? (concurrentReadOps.length * avgConcurrentReadRPS + isolationReadOps.length * avgIsolationReadRPS)
+        / (concurrentReadOps.length + isolationReadOps.length)
+      : 0),
+    readP50: r(concReadP50),
+    readP90: r(concReadP90),
+    readP99: r(concReadP99),
+    writeP50: r(writeP50),
+    writeP90: r(writeP90),
+    writeP99: r(writeP99),
     totalWriteOps,
     totalReadOps,
     totalWriteErrors,
