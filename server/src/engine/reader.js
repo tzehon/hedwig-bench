@@ -132,15 +132,20 @@ export class ReadWorker {
           }
         } else {
           // ── Concurrent: point reads returning 1 item ──
+          // Use find().limit(1) instead of findOne for lower driver overhead
           const cachedMsgId = this._knownMsgIds.get(userId);
           if (cachedMsgId) {
-            await this._collection.findOne({ user_id: userId, msg_id: cachedMsgId });
+            await this._collection
+              .find({ user_id: userId, msg_id: cachedMsgId })
+              .limit(1)
+              .next();
           } else {
             // User not in cache — find any doc, cache msg_id for next time
-            const doc = await this._collection.findOne(
-              { user_id: userId },
-              { projection: { user_id: 1, msg_id: 1 } },
-            );
+            const doc = await this._collection
+              .find({ user_id: userId })
+              .project({ user_id: 1, msg_id: 1 })
+              .limit(1)
+              .next();
             if (doc?.msg_id) {
               this._knownMsgIds.set(userId, doc.msg_id);
             }
