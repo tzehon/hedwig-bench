@@ -204,7 +204,8 @@ export class RunManager {
         }
       };
 
-      // ── 8. Start everything ──
+      // ── 8. Pre-seed reader cache & start everything ──
+      await this._reader.seedCache();
       this._writer.start();
       this._reader.start();
       this._metricsCollector.start();

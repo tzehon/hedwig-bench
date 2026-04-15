@@ -287,7 +287,7 @@ export default function ConfigPage() {
   const [readRPSMax, setReadRPSMax] = useState(10000);
   const [readRPSAvg, setReadRPSAvg] = useState(5000);
   const [readIsolationPct, setReadIsolationPct] = useState(40);
-  const [readLanes, setReadLanes] = useState(100);
+  const [readLanes, setReadLanes] = useState(150);
 
   // -- Spike Pattern --
   const [numSpikes, setNumSpikes] = useState(2);

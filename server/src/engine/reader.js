@@ -43,6 +43,32 @@ export class ReadWorker {
      * true  = isolation (list queries, 50–100 items)
      */
     this.isolationMode = false;
+
+    /**
+     * Cache of known msg_ids per user for point reads that hit real documents.
+     * Populated lazily from actual queries.
+     * @type {Map<string, string>}
+     */
+    this._knownMsgIds = new Map();
+  }
+
+  /**
+   * Pre-seed the msg_id cache by sampling documents from the collection.
+   * Called once before lanes start so point reads hit real documents immediately.
+   */
+  async seedCache() {
+    try {
+      const docs = await this._collection
+        .aggregate([{ $sample: { size: 5000 } }, { $project: { user_id: 1, msg_id: 1 } }])
+        .toArray();
+      for (const doc of docs) {
+        if (doc.user_id && doc.msg_id) {
+          this._knownMsgIds.set(doc.user_id, doc.msg_id);
+        }
+      }
+    } catch {
+      // Collection may be empty on first run — that's fine
+    }
   }
 
   /**
@@ -77,35 +103,43 @@ export class ReadWorker {
         if (this.isolationMode) {
           // ── Isolation: list queries returning 50–100 items ──
           const limit = 50 + Math.floor(Math.random() * 51); // 50–100
+          let results;
 
           if (Math.random() < 0.5) {
             // Recent messages
             const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-            await this._collection
+            results = await this._collection
               .find({ user_id: userId, created_at: { $gt: since } })
-              .project({ body: 0 })
+              .project({ body: 0, msg_id: 1, user_id: 1 })
               .sort({ created_at: -1 })
               .limit(limit)
               .toArray();
           } else {
             // Filtered inbox
             const status = STATUSES[Math.floor(Math.random() * STATUSES.length)];
-            await this._collection
+            results = await this._collection
               .find({ user_id: userId, status })
-              .project({ body: 0 })
+              .project({ body: 0, msg_id: 1, user_id: 1 })
               .sort({ created_at: -1 })
               .limit(limit)
               .toArray();
           }
+
+          // Cache a msg_id for this user so point reads can hit real documents
+          if (results.length > 0) {
+            const pick = results[Math.floor(Math.random() * results.length)];
+            if (pick.msg_id) this._knownMsgIds.set(pick.user_id, pick.msg_id);
+          }
         } else {
           // ── Concurrent: point reads returning 1 item ──
-          const h = '0123456789abcdef';
-          let msgId = '';
-          for (let i = 0; i < 36; i++) {
-            if (i === 8 || i === 13 || i === 18 || i === 23) msgId += '-';
-            else msgId += h[Math.floor(Math.random() * 16)];
+          // Use a cached msg_id so the read hits a real document (seeded at start).
+          const cachedMsgId = this._knownMsgIds.get(userId);
+          if (cachedMsgId) {
+            await this._collection.findOne({ user_id: userId, msg_id: cachedMsgId });
+          } else {
+            // User not in cache — do an indexed lookup, cache for next time
+            await this._collection.findOne({ user_id: userId });
           }
-          await this._collection.findOne({ user_id: userId, msg_id: msgId });
         }
 
         const elapsed = performance.now() - start;
