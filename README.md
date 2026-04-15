@@ -227,7 +227,7 @@ For each query, the results show:
 | Read | Isolation % | `40` | 0–80 | Variable mode: percentage of total run time that is read-only (no concurrent writes) |
 | Read | Concurrency (lanes) | `150` | 1–2,000 | Total concurrent read lanes distributed across worker threads. |
 | Read | Worker threads | `4` | 1–16 | Number of worker threads for reads. Each thread has its own event loop, connection pool, and rate limiter. Eliminates single-thread bottleneck. |
-| Spike | Number of spikes | `2` | 1–10 | How many write spikes |
+| Spike | Number of spikes | `1` | 1–10 | How many write spikes |
 | Spike | Ramp-up (seconds) | `60` | 30–300 | Linear ramp from 0 → target RPS |
 | Spike | Sustain (seconds) | `120` | 30–600 | Hold at target RPS |
 | Spike | Gap (seconds) | `30` | 30–300 | Pause between spikes (reads continue) |
@@ -298,7 +298,7 @@ blockDuration = ceil(totalIsolation / numSpikes)
 total = writeActive + numSpikes × blockDuration
 ```
 
-Default (2 spikes, 40% isolation): `writeActive = 480s, blockDuration = 160s → total = 480 + 320 = 800s ≈ 13.3 minutes`
+Default (1 spike, 40% isolation): `writeActive = 240s, blockDuration = 160s → total = 240 + 160 = 400s ≈ 6.7 minutes`
 
 ### Document Schema
 

@@ -52,7 +52,7 @@ What to check:
 
 ---
 
-## 3. Full Benchmark (~13.5 minutes)
+## 3. Full Benchmark (~7 minutes)
 
 Go back to the home page (`/`). Your URI is still saved.
 
@@ -71,7 +71,7 @@ Go back to the home page (`/`). Your URI is still saved.
 | Read isolation | 40% | 40% of run is read-only, 60% concurrent with writes |
 | Read lanes | 150 | Total lanes distributed across worker threads |
 | Read worker threads | 4 | Each thread has its own connection pool and event loop |
-| Spikes | 2 | Simulates multiple campaign blasts |
+| Spikes | 1 | Simulates a campaign blast |
 | Ramp | 60s | Gradual ramp to peak |
 | Sustain | 120s | 2 minutes at peak per spike |
 | Gap | 30s | Between spikes (reads continue at min RPS) |
@@ -81,7 +81,7 @@ Go back to the home page (`/`). Your URI is still saved.
 
 1. Select **Drop collection** under "Before run" (start clean)
 2. Click **Start Benchmark**, confirm
-3. Watch the Live Dashboard for ~13.5 minutes (isolation blocks interleave after each spike)
+3. Watch the Live Dashboard for ~7 minutes (isolation blocks interleave after each spike)
 4. Review results when complete
 
 ### Second run (with existing data)
