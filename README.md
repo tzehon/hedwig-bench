@@ -125,7 +125,7 @@ The home page presents a form with collapsible sections for all benchmark parame
 Shows real-time benchmark progress with charts updating every second via WebSocket.
 
 **Layout:**
-- **Top bar**: Run name/ID, elapsed time (MM:SS), current phase badge (Ramp / Sustain / Cooldown / Gap / Complete), progress bar.
+- **Top bar**: Run name/ID, elapsed time (MM:SS), current phase badge (Ramp / Sustain / Cooldown / Gap / Read Only / Complete) with Concurrent/Isolation mode indicator, progress bar, and a segmented bar showing the concurrent vs isolation split.
 - **Throughput charts** (side-by-side): Write ops/sec actual vs target (dashed), Read ops/sec actual vs target (both dynamic).
 - **Latency charts** (side-by-side): Write latency per document (p50/p95/p99), Read latency per query (p50/p95/p99) with 50ms threshold reference line.
 - **System chart** (wide): Connection count, insert ops/sec, query ops/sec, WiredTiger dirty cache bytes. Updates every 5 seconds.

@@ -374,6 +374,20 @@ export default function LiveDashboard() {
   const progressPct = Math.min(100, (currentStats.elapsedSeconds / totalDuration) * 100);
   const highErrorRate = currentStats.errorRate > 1;
 
+  // Compute concurrent vs isolation boundary for the segmented bar
+  const readIsolationPct = runConfig?.readIsolationPct || 0;
+  const writeScheduleTime = (() => {
+    if (!runConfig) return totalDuration;
+    const ns = runConfig.numSpikes || 1;
+    const ramp = runConfig.rampSeconds || 120;
+    const sustain = runConfig.sustainSeconds || 180;
+    const gap = runConfig.gapSeconds || 60;
+    return ns * (ramp + sustain + 60) + Math.max(0, ns - 1) * gap;
+  })();
+  const concurrentPct = totalDuration > 0 ? (writeScheduleTime / totalDuration) * 100 : 100;
+  const isConcurrentPhase = currentStats.phase !== 'read_only' && currentStats.phase !== 'complete';
+  const isIsolationPhase = currentStats.phase === 'read_only';
+
   // ------------------------------------------------------------------
   // Chart common props
   // ------------------------------------------------------------------
@@ -420,8 +434,19 @@ export default function LiveDashboard() {
             </div>
             <div>
               <span className="text-xs text-gray-400">Phase</span>
-              <div className="mt-0.5">
+              <div className="mt-0.5 flex items-center gap-2">
                 <PhaseBadge phase={currentStats.phase} />
+                {readIsolationPct > 0 && !isFinished && (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                    isIsolationPhase
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                      : isConcurrentPhase
+                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                      : 'bg-gray-500/20 text-gray-300 border-gray-500/30'
+                  }`}>
+                    {isIsolationPhase ? 'Isolation' : isConcurrentPhase ? 'Concurrent' : ''}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -472,6 +497,30 @@ export default function LiveDashboard() {
               style={{ width: `${progressPct}%` }}
             />
           </div>
+
+          {/* Concurrent / Isolation segmented bar */}
+          {readIsolationPct > 0 && (
+            <div className="mt-2">
+              <div className="flex w-full h-3 rounded-full overflow-hidden border border-gray-700">
+                <div
+                  className={`flex items-center justify-center text-[9px] font-medium transition-colors ${
+                    isConcurrentPhase ? 'bg-blue-500/40 text-blue-200' : 'bg-blue-500/15 text-blue-400/60'
+                  }`}
+                  style={{ width: `${concurrentPct}%` }}
+                >
+                  Concurrent ({Math.round(concurrentPct)}%)
+                </div>
+                <div
+                  className={`flex items-center justify-center text-[9px] font-medium transition-colors ${
+                    isIsolationPhase ? 'bg-purple-500/40 text-purple-200' : 'bg-purple-500/15 text-purple-400/60'
+                  }`}
+                  style={{ width: `${100 - concurrentPct}%` }}
+                >
+                  Isolation ({Math.round(100 - concurrentPct)}%)
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
