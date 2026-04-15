@@ -262,6 +262,7 @@ export default function ConfigPage() {
   const [dbName, setDbName] = useState('hedwig_bench');
   const [collectionName, setCollectionName] = useState('inbox');
   const [poolSize, setPoolSize] = useState(200);
+  const [deploymentMode, setDeploymentMode] = useState('replicaSet'); // 'replicaSet' | 'sharded'
 
   // -- Document Shape --
   const [docSize, setDocSize] = useState(3);
@@ -331,6 +332,7 @@ export default function ConfigPage() {
       dbName,
       collectionName,
       poolSize,
+      deploymentMode,
       docSize,
       userPoolSize,
       indexProfile,
@@ -353,7 +355,7 @@ export default function ConfigPage() {
       ...overrides,
     }),
     [
-      runName, mongoUri, dbName, collectionName, poolSize, docSize, userPoolSize,
+      runName, mongoUri, dbName, collectionName, poolSize, deploymentMode, docSize, userPoolSize,
       indexProfile, writeMode, batchSize, targetWriteRPS, writeConcern, uncapped, writeLanes,
       readRPSConcurrent, readRPSIsolation, readIsolationPct, readLanes,
       numSpikes, rampSeconds, sustainSeconds, gapSeconds,
@@ -523,6 +525,34 @@ export default function ConfigPage() {
             onChange={(e) => setPoolSize(Number(e.target.value))}
             min={1}
           />
+        </div>
+
+        <div>
+          <Label>Deployment mode</Label>
+          <div className="flex rounded-md overflow-hidden border border-gray-700">
+            {[
+              { value: 'replicaSet', label: 'Replica Set' },
+              { value: 'sharded', label: 'Sharded' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setDeploymentMode(opt.value)}
+                className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+                  deploymentMode === opt.value
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {deploymentMode === 'sharded' && (
+            <p className="text-xs text-gray-500 mt-1">
+              Enables sharding on the database and shards the collection with {'{ user_id: "hashed" }'}. Requires a sharded cluster and clusterAdmin role.
+            </p>
+          )}
         </div>
       </Section>
 

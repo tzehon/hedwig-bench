@@ -47,3 +47,35 @@ export async function setupIndexes(collection, profile) {
 
   return indexSpecs.length;
 }
+
+/**
+ * Enable sharding on the database and shard the collection with { user_id: "hashed" }.
+ * Both commands are idempotent — safe to call on an already-sharded collection.
+ *
+ * Requires the MongoDB user to have clusterAdmin or clusterManager role.
+ * Must be connected to a sharded cluster (mongos), not a plain replica set.
+ *
+ * @param {import('mongodb').Db} db - The MongoDB database handle
+ * @param {string} collectionName - The collection to shard
+ */
+export async function setupSharding(db, collectionName) {
+  const admin = db.admin();
+
+  // Enable sharding on the database (no-op on MongoDB 6.0+ but harmless)
+  await admin.command({ enableSharding: db.databaseName });
+
+  // Shard the collection with a hashed shard key on user_id
+  try {
+    await admin.command({
+      shardCollection: `${db.databaseName}.${collectionName}`,
+      key: { user_id: 'hashed' },
+    });
+  } catch (err) {
+    // Code 20 = AlreadyInitialized — collection is already sharded
+    if (err.code === 20) {
+      // Already sharded — continue
+    } else {
+      throw err;
+    }
+  }
+}

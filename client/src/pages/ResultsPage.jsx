@@ -375,6 +375,10 @@ export default function ResultsPage() {
               <span className="text-xs text-gray-400">Write Concern</span>
               <span className="text-sm text-gray-200 font-mono">{config.writeConcern || '--'}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">Deployment</span>
+              <span className="text-sm text-gray-200 font-mono">{config.deploymentMode === 'sharded' ? 'Sharded' : 'Replica Set'}</span>
+            </div>
           </div>
         </SummaryCard>
 

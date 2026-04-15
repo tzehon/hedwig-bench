@@ -3,7 +3,7 @@ import { RateLimiter } from './rateLimiter.js';
 import { WriteWorker } from './writer.js';
 import { ReadWorker } from './reader.js';
 import { MetricsCollector } from './metrics.js';
-import { setupIndexes } from './indexes.js';
+import { setupIndexes, setupSharding } from './indexes.js';
 import { generateSchedule, getTotalDurationSeconds } from './spike.js';
 
 const COOLDOWN_SECONDS = 60;
@@ -135,7 +135,12 @@ export class RunManager {
         await this._collection.deleteMany({});
       }
 
-      // ── 3. Set up indexes ──
+      // ── 3. Set up sharding (if sharded mode) ──
+      if (this._config.deploymentMode === 'sharded') {
+        await setupSharding(this._db, this._config.collectionName);
+      }
+
+      // ── 4. Set up indexes ──
       await setupIndexes(this._collection, this._config.indexProfile);
 
       // ── 4. Generate spike schedule ──
