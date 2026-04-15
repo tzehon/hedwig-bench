@@ -134,7 +134,10 @@ export class ReadWorker {
           // ── Concurrent: point reads returning 1 item ──
           const cachedMsgId = this._knownMsgIds.get(userId);
           if (cachedMsgId) {
-            await this._collection.findOne({ user_id: userId, msg_id: cachedMsgId });
+            await this._collection.findOne(
+              { user_id: userId, msg_id: cachedMsgId },
+              { projection: { body: 0 } },
+            );
           } else {
             // User not in cache — find any doc, cache msg_id for next time
             const doc = await this._collection.findOne(
