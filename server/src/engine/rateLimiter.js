@@ -96,8 +96,8 @@ export class RateLimiter {
    */
   updateRate(newTokensPerSecond) {
     this.tokensPerSecond = newTokensPerSecond;
-    // Keep bucket size proportional to current rate (2x for small burst tolerance)
-    this.bucketSize = Math.max(newTokensPerSecond * 2, 1000);
+    // Keep bucket size equal to current rate (1 second of tokens) to prevent overshoot
+    this.bucketSize = Math.max(newTokensPerSecond, 1000);
     // Cap current tokens to new bucket size
     this.tokens = Math.min(this.tokens, this.bucketSize);
   }
