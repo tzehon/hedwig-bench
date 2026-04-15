@@ -408,12 +408,16 @@ export default function ResultsPage() {
         <SummaryCard title="Concurrent Reads" borderColor="#3b82f6">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Target</span>
-              <span className="text-sm text-gray-300 font-mono">{fmtRPS(config.readRPSConcurrent)} qps &times; 1 doc = {fmtRPS(config.readRPSConcurrent)} docs/s</span>
+              <span className="text-xs text-gray-400">Target QPS</span>
+              <span className="text-sm text-gray-300 font-mono">{fmtRPS(config.readRPSConcurrent)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">Achieved QPS</span>
               <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.avgConcurrentReadRPS)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">Docs/query</span>
+              <span className="text-sm text-gray-300 font-mono">1</span>
             </div>
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">p50</span>
@@ -434,12 +438,16 @@ export default function ResultsPage() {
         <SummaryCard title="Isolation Reads" borderColor="#a855f7">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Target</span>
-              <span className="text-sm text-gray-300 font-mono">{fmtRPS(config.readRPSIsolation)} qps &times; ~30 docs = {fmtRPS((config.readRPSIsolation || 0) * 30)} docs/s</span>
+              <span className="text-xs text-gray-400">Target QPS</span>
+              <span className="text-sm text-gray-300 font-mono">{fmtRPS(config.readRPSIsolation)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">Achieved QPS</span>
               <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.avgIsolationReadRPS)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">Docs/query</span>
+              <span className="text-sm text-gray-300 font-mono">~30 avg</span>
             </div>
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">p50</span>
