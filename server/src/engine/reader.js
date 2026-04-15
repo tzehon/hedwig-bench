@@ -108,9 +108,11 @@ export class ReadWorker {
           case 'recent_messages': {
             // WHERE user_id = ? AND created_at > ? LIMIT 20
             // Look for messages in the last 24 hours
+            // Project out body — list views show subjects, not full message bodies
             const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
             await this._collection
               .find({ user_id: userId, created_at: { $gt: since } })
+              .project({ body: 0 })
               .sort({ created_at: -1 })
               .limit(20)
               .toArray();
@@ -118,9 +120,11 @@ export class ReadWorker {
           }
           case 'filtered_inbox': {
             // WHERE user_id = ? AND status = ? ORDER BY created_at DESC LIMIT 20
+            // Project out body — list views show subjects, not full message bodies
             const status = STATUSES[Math.floor(Math.random() * STATUSES.length)];
             await this._collection
               .find({ user_id: userId, status })
+              .project({ body: 0 })
               .sort({ created_at: -1 })
               .limit(20)
               .toArray();

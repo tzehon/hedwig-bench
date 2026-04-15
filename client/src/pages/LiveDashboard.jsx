@@ -18,6 +18,7 @@ const PHASE_COLORS = {
   sustain: 'bg-green-500/20 text-green-300 border-green-500/30',
   cooldown: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
   gap: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
+  read_only: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
   complete: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
 };
 
@@ -68,7 +69,7 @@ function CustomTooltip({ active, payload, label }) {
 // Phase Badge
 // ---------------------------------------------------------------------------
 function PhaseBadge({ phase }) {
-  const label = phase ? phase.charAt(0).toUpperCase() + phase.slice(1) : 'Unknown';
+  const label = phase === 'read_only' ? 'Read Only' : phase ? phase.charAt(0).toUpperCase() + phase.slice(1) : 'Unknown';
   const colorClass = PHASE_COLORS[phase] || PHASE_COLORS.gap;
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colorClass}`}>
@@ -170,7 +171,7 @@ export default function LiveDashboard() {
               actualWriteRPS: w.ops || 0,
               targetWriteRPS: d.targetWriteRPS || 0,
               actualReadRPS: r.ops || 0,
-              targetReadRPS: runConfig?.targetReadRPS || 0,
+              targetReadRPS: d.targetReadRPS || 0,
               writeP50: w.p50 || 0,
               writeP95: w.p95 || 0,
               writeP99: w.p99 || 0,
@@ -202,7 +203,7 @@ export default function LiveDashboard() {
               writeRPS: w.ops || 0,
               readRPS: r.ops || 0,
               targetWriteRPS: d.targetWriteRPS || 0,
-              targetReadRPS: runConfig?.targetReadRPS || 0,
+              targetReadRPS: d.targetReadRPS || 0,
               writeErrors: w.errors || 0,
               readErrors: r.errors || 0,
               errorRate: totalOps > 0 ? (totalErrors / totalOps) * 100 : 0,
@@ -355,10 +356,21 @@ export default function LiveDashboard() {
   const visibleSystem = displayMetrics(systemData);
 
   // Compute progress from elapsed seconds and config
-  const totalDuration = runConfig
-    ? (runConfig.numSpikes || 1) * ((runConfig.rampSeconds || 120) + (runConfig.sustainSeconds || 180) + 60)
-      + Math.max(0, (runConfig.numSpikes || 1) - 1) * (runConfig.gapSeconds || 60)
-    : 1;
+  const totalDuration = (() => {
+    if (!runConfig) return 1;
+    const ns = runConfig.numSpikes || 1;
+    const ramp = runConfig.rampSeconds || 120;
+    const sustain = runConfig.sustainSeconds || 180;
+    const gap = runConfig.gapSeconds || 60;
+    const spikeLen = ramp + sustain + 60;
+    const gaps = Math.max(0, ns - 1) * gap;
+    const writeTime = ns * spikeLen + gaps;
+    const isoPct = runConfig.readIsolationPct || 0;
+    const extraReadOnly = isoPct > 0
+      ? Math.max(0, Math.ceil((isoPct / 100 * writeTime - gaps) / (1 - isoPct / 100)))
+      : 0;
+    return writeTime + extraReadOnly;
+  })();
   const progressPct = Math.min(100, (currentStats.elapsedSeconds / totalDuration) * 100);
   const highErrorRate = currentStats.errorRate > 1;
 

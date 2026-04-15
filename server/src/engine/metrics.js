@@ -49,6 +49,7 @@ export class MetricsCollector {
     // Current phase and target RPS (set externally by RunManager)
     this.phase = 'gap';
     this.targetWriteRPS = 0;
+    this.targetReadRPS = 0;
   }
 
   /**
@@ -86,6 +87,7 @@ export class MetricsCollector {
       timestamp: new Date().toISOString(),
       phase: this.phase,
       targetWriteRPS: this.targetWriteRPS,
+      targetReadRPS: this.targetReadRPS,
       write: {
         ops: writerMetrics.ops,
         errors: writerMetrics.errors,

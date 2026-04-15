@@ -106,13 +106,17 @@ function EyeIcon({ open }) {
 // ---------------------------------------------------------------------------
 // Spike SVG Preview
 // ---------------------------------------------------------------------------
-function SpikePreview({ targetWriteRPS, numSpikes, rampSeconds, sustainSeconds, gapSeconds }) {
+function SpikePreview({ targetWriteRPS, numSpikes, rampSeconds, sustainSeconds, gapSeconds, readRPSMin, readRPSMax, readRPSAvg, readIsolationPct }) {
   const schedule = generateSchedule({
     targetWriteRPS,
     numSpikes,
     rampSeconds,
     sustainSeconds,
     gapSeconds,
+    readRPSMin,
+    readRPSMax,
+    readRPSAvg,
+    readIsolationPct,
   });
 
   if (schedule.length === 0) return null;
@@ -124,18 +128,29 @@ function SpikePreview({ targetWriteRPS, numSpikes, rampSeconds, sustainSeconds, 
   const plotH = svgH - pad.top - pad.bottom;
 
   const maxT = schedule[schedule.length - 1].second;
-  const maxRPS = targetWriteRPS || 1;
+  const maxRPS = Math.max(targetWriteRPS || 1, readRPSMax || 1);
 
   const xScale = (s) => pad.left + (s / (maxT || 1)) * plotW;
   const yScale = (rps) => pad.top + plotH - (rps / maxRPS) * plotH;
 
-  // Build polyline points
+  // Build write polyline points
   const points = schedule.map((p) => `${xScale(p.second).toFixed(1)},${yScale(p.targetWriteRPS).toFixed(1)}`);
 
-  // Area path (fill under curve)
+  // Build read polyline points
+  const readPoints = schedule.map((p) => `${xScale(p.second).toFixed(1)},${yScale(p.targetReadRPS).toFixed(1)}`);
+
+  // Write area path (fill under curve)
   const areaPath = [
     `M ${xScale(0).toFixed(1)},${yScale(0).toFixed(1)}`,
     ...schedule.map((p) => `L ${xScale(p.second).toFixed(1)},${yScale(p.targetWriteRPS).toFixed(1)}`),
+    `L ${xScale(maxT).toFixed(1)},${yScale(0).toFixed(1)}`,
+    'Z',
+  ].join(' ');
+
+  // Read area path
+  const readAreaPath = [
+    `M ${xScale(0).toFixed(1)},${yScale(0).toFixed(1)}`,
+    ...schedule.map((p) => `L ${xScale(p.second).toFixed(1)},${yScale(p.targetReadRPS).toFixed(1)}`),
     `L ${xScale(maxT).toFixed(1)},${yScale(0).toFixed(1)}`,
     'Z',
   ].join(' ');
@@ -204,11 +219,21 @@ function SpikePreview({ targetWriteRPS, numSpikes, rampSeconds, sustainSeconds, 
           </g>
         ))}
 
-        {/* Area fill */}
+        {/* Write area fill */}
         <path d={areaPath} fill="#818CF8" fillOpacity="0.2" />
+        {/* Read area fill */}
+        <path d={readAreaPath} fill="#34D399" fillOpacity="0.15" />
 
-        {/* Line */}
+        {/* Write line */}
         <polyline points={points.join(' ')} fill="none" stroke="#818CF8" strokeWidth="1.5" />
+        {/* Read line */}
+        <polyline points={readPoints.join(' ')} fill="none" stroke="#34D399" strokeWidth="1.5" strokeDasharray="4 2" />
+
+        {/* Legend */}
+        <line x1={pad.left + 4} y1={pad.top + 2} x2={pad.left + 20} y2={pad.top + 2} stroke="#818CF8" strokeWidth="1.5" />
+        <text x={pad.left + 24} y={pad.top + 5} className="text-[8px]" fill="#818CF8">Write</text>
+        <line x1={pad.left + 58} y1={pad.top + 2} x2={pad.left + 74} y2={pad.top + 2} stroke="#34D399" strokeWidth="1.5" strokeDasharray="4 2" />
+        <text x={pad.left + 78} y={pad.top + 5} className="text-[8px]" fill="#34D399">Read</text>
       </svg>
     </div>
   );
@@ -257,7 +282,12 @@ export default function ConfigPage() {
   const [writeLanes, setWriteLanes] = useState(50);
 
   // -- Read Config --
-  const [targetReadRPS, setTargetReadRPS] = useState(1500);
+  const [readMode, setReadMode] = useState('variable'); // 'constant' | 'variable'
+  const [readRPSMin, setReadRPSMin] = useState(3500);
+  const [readRPSMax, setReadRPSMax] = useState(10000);
+  const [readRPSAvg, setReadRPSAvg] = useState(5000);
+  const [readIsolationPct, setReadIsolationPct] = useState(40);
+  const [readLanes, setReadLanes] = useState(100);
 
   // -- Spike Pattern --
   const [numSpikes, setNumSpikes] = useState(2);
@@ -293,7 +323,7 @@ export default function ConfigPage() {
   }, [docSize, userPoolSize]);
 
   // -- Computed total duration --
-  const totalDuration = getTotalDuration({ numSpikes, rampSeconds, sustainSeconds, gapSeconds });
+  const totalDuration = getTotalDuration({ numSpikes, rampSeconds, sustainSeconds, gapSeconds, readIsolationPct });
 
   // -- Build config object --
   const buildConfig = useCallback(
@@ -312,7 +342,11 @@ export default function ConfigPage() {
       writeConcern,
       uncapped,
       writeConcurrency: writeLanes,
-      targetReadRPS,
+      readRPSMin,
+      readRPSMax,
+      readRPSAvg,
+      readIsolationPct,
+      readConcurrency: readLanes,
       numSpikes,
       rampSeconds,
       sustainSeconds,
@@ -324,7 +358,8 @@ export default function ConfigPage() {
     [
       runName, mongoUri, dbName, collectionName, poolSize, docSize, userPoolSize,
       indexProfile, writeMode, batchSize, targetWriteRPS, writeConcern, uncapped, writeLanes,
-      targetReadRPS, numSpikes, rampSeconds, sustainSeconds, gapSeconds,
+      readRPSMin, readRPSMax, readRPSAvg, readIsolationPct, readLanes,
+      numSpikes, rampSeconds, sustainSeconds, gapSeconds,
       dropMode,
     ],
   );
@@ -367,7 +402,11 @@ export default function ConfigPage() {
   const handleSmokeTest = useCallback(() => {
     setNumSpikes(1);
     setTargetWriteRPS(5000);
-    setTargetReadRPS(500);
+    setReadMode('constant');
+    setReadRPSMin(500);
+    setReadRPSMax(500);
+    setReadRPSAvg(500);
+    setReadIsolationPct(0);
     setRampSeconds(10);
     setSustainSeconds(30);
     setGapSeconds(10);
@@ -378,7 +417,10 @@ export default function ConfigPage() {
       handleStart({
         numSpikes: 1,
         targetWriteRPS: 5000,
-        targetReadRPS: 500,
+        readRPSMin: 500,
+        readRPSMax: 500,
+        readRPSAvg: 500,
+        readIsolationPct: 0,
         rampSeconds: 10,
         sustainSeconds: 30,
         gapSeconds: 10,
@@ -613,15 +655,115 @@ export default function ConfigPage() {
       {/* Read Configuration                                               */}
       {/* ---------------------------------------------------------------- */}
       <Section title="Read Configuration">
-        <RangeSlider
-          id="targetReadRPS"
-          value={targetReadRPS}
-          onChange={(e) => setTargetReadRPS(Number(e.target.value))}
-          min={100}
-          max={5000}
-          step={100}
-          label="Target read RPS"
-        />
+        {/* Mode toggle */}
+        <div>
+          <Label>Read mode</Label>
+          <div className="flex rounded-md overflow-hidden border border-gray-700 mb-2">
+            {[
+              { value: 'constant', label: 'Constant' },
+              { value: 'variable', label: 'Variable' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setReadMode(opt.value)}
+                className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+                  readMode === opt.value
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500">
+            {readMode === 'constant'
+              ? 'Constant: reads run at a fixed rate throughout the entire benchmark, concurrent with writes. Matches the legacy behavior — useful as a baseline.'
+              : 'Variable: reads vary between min and max RPS, with a configurable percentage of the run dedicated to read-only isolation (no concurrent writes). Tests both contention and isolation performance.'}
+          </p>
+        </div>
+
+        {readMode === 'constant' ? (
+          /* Constant mode: single slider */
+          <RangeSlider
+            id="readRPSConstant"
+            value={readRPSAvg}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setReadRPSAvg(v);
+              setReadRPSMin(v);
+              setReadRPSMax(v);
+              setReadIsolationPct(0);
+            }}
+            min={100}
+            max={15000}
+            step={100}
+            label="Target read RPS"
+          />
+        ) : (
+          /* Variable mode: min/avg/max + isolation */
+          <>
+            <div className="grid grid-cols-3 gap-4">
+              <RangeSlider
+                id="readRPSMin"
+                value={readRPSMin}
+                onChange={(e) => setReadRPSMin(Math.min(Number(e.target.value), readRPSAvg))}
+                min={100}
+                max={15000}
+                step={100}
+                label="Min read RPS"
+              />
+              <RangeSlider
+                id="readRPSAvg"
+                value={readRPSAvg}
+                onChange={(e) => setReadRPSAvg(Number(e.target.value))}
+                min={100}
+                max={15000}
+                step={100}
+                label="Avg read RPS"
+              />
+              <RangeSlider
+                id="readRPSMax"
+                value={readRPSMax}
+                onChange={(e) => setReadRPSMax(Math.max(Number(e.target.value), readRPSAvg))}
+                min={100}
+                max={20000}
+                step={100}
+                label="Max read RPS"
+              />
+            </div>
+
+            <RangeSlider
+              id="readIsolationPct"
+              value={readIsolationPct}
+              onChange={(e) => setReadIsolationPct(Number(e.target.value))}
+              min={0}
+              max={80}
+              step={5}
+              label="Read isolation (% of run without writes)"
+              unit="%"
+            />
+            {readIsolationPct > 0 && (
+              <p className="text-xs text-gray-500">
+                {readIsolationPct}% of the run will be read-only (no concurrent writes).
+                A read spike (triangle: {readRPSMin.toLocaleString()} &rarr; {readRPSMax.toLocaleString()} &rarr; {readRPSMin.toLocaleString()}) runs during the isolation phase.
+              </p>
+            )}
+          </>
+        )}
+
+        <div className="w-1/2">
+          <Label htmlFor="readLanes">Read concurrency (lanes)</Label>
+          <TextInput
+            id="readLanes"
+            type="number"
+            value={readLanes}
+            onChange={(e) => setReadLanes(Number(e.target.value))}
+            min={1}
+            max={500}
+          />
+        </div>
       </Section>
 
       {/* ---------------------------------------------------------------- */}
@@ -684,6 +826,10 @@ export default function ConfigPage() {
             rampSeconds={rampSeconds}
             sustainSeconds={sustainSeconds}
             gapSeconds={gapSeconds}
+            readRPSMin={readRPSMin}
+            readRPSMax={readRPSMax}
+            readRPSAvg={readRPSAvg}
+            readIsolationPct={readIsolationPct}
           />
         </div>
       </Section>

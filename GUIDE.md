@@ -46,14 +46,13 @@ This verifies connectivity and gives you a quick feel for the tool.
 5. After ~100 seconds the run completes and you're taken to **Results**
 
 What to check:
-- Did the green "Actual" line track the dashed "Target" line?
+- Did the green "Actual" lines track the dashed "Target" lines for both writes and reads?
 - What's the p99 write latency (per document)?
 - Any errors in the bottom bar?
-- Did it PASS or FAIL?
 
 ---
 
-## 3. Full Benchmark (~8.5 minutes)
+## 3. Full Benchmark (~13.5 minutes)
 
 Go back to the home page (`/`). Your URI is still saved.
 
@@ -66,18 +65,23 @@ Go back to the home page (`/`). Your URI is still saved.
 | Batch size | 500 | Good balance of throughput vs latency |
 | Target write RPS | 35,000 | Hedwig peak write rate |
 | Write concern | w:majority | Fixed — matches production durability |
-| Target read RPS | 1,500 | Hedwig steady-state read rate |
+| Read mode | Variable | Variable for realistic patterns; Constant for a simple baseline |
+| Min read RPS | 3,500 | Floor during gaps and isolation ramp |
+| Avg read RPS | 5,000 | Target average read rate across the run |
+| Max read RPS | 10,000 | Peak during the read isolation spike |
+| Read isolation | 40% | 40% of run is read-only, 60% concurrent with writes |
+| Read lanes | 50 | Increase if reads can't keep up at high RPS |
 | Spikes | 2 | Simulates multiple campaign blasts |
 | Ramp | 60s | Gradual ramp to peak |
 | Sustain | 120s | 2 minutes at peak per spike |
-| Gap | 30s | Between spikes (reads continue) |
+| Gap | 30s | Between spikes (reads continue at min RPS) |
 | Uncapped mode | Off | Rate-limited to test at target RPS |
 
 ### First full run
 
 1. Select **Drop collection** under "Before run" (start clean)
 2. Click **Start Benchmark**, confirm
-3. Watch the Live Dashboard for ~8.5 minutes
+3. Watch the Live Dashboard for ~13.5 minutes (includes read-only isolation phase)
 4. Review results when complete
 
 ### Second run (with existing data)
@@ -85,6 +89,13 @@ Go back to the home page (`/`). Your URI is still saved.
 1. Select **Keep existing data** — data from the first run stays
 2. Run again with the same or different settings
 3. This is more realistic: reads now query against millions of existing documents
+
+### Comparing constant vs variable reads
+
+To see the impact of read isolation vs concurrent-only reads:
+1. Run once in **Variable** mode (default: 40% isolation, min 3.5k / avg 5k / max 10k RPS)
+2. Run again in **Constant** mode at the same average (5,000 RPS)
+3. Go to History → compare the two runs to see latency differences
 
 ### Finding max throughput
 

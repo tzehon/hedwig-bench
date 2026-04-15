@@ -64,6 +64,13 @@ export class WriteWorker {
 
     while (!this._stopped) {
       try {
+        // When write rate is 0 (gap / read-only phase), sleep briefly
+        // instead of entering a 30s acquire-timeout loop
+        if (!this._uncapped && this._rateLimiter.tokensPerSecond === 0) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+
         if (mode === 'bulk') {
           if (!this._uncapped) await this._rateLimiter.acquire(batchSize);
           const docs = generateDocuments(batchSize, docSizeKB, userPoolSize);

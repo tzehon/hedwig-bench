@@ -79,6 +79,16 @@ function resolveSpikeAndPhase(second, config) {
     offset -= isLastSpike ? spikeLength : cycleLength;
   }
 
+  // After all write spikes: check for read-only isolation phase
+  const readIsolationPct = config.readIsolationPct ?? 0;
+  if (readIsolationPct > 0) {
+    const gaps = Math.max(0, numSpikes - 1) * gapSeconds;
+    const writeScheduleTime = numSpikes * spikeLength + gaps;
+    const pct = readIsolationPct / 100;
+    const extraReadOnly = Math.max(0, Math.ceil((pct * writeScheduleTime - gaps) / (1 - pct)));
+    if (offset < extraReadOnly) return { spikeIndex: -1, phase: 'read_only' };
+  }
+
   return { spikeIndex: -1, phase: 'complete' };
 }
 
@@ -89,6 +99,7 @@ function computeSummary(timeseries, config) {
   if (!timeseries || timeseries.length === 0) {
     return {
       peakWriteRPS: 0,
+      peakReadRPS: 0,
       avgWriteRPS: 0,
       avgReadRPS: 0,
       writeP99: 0,
@@ -104,18 +115,20 @@ function computeSummary(timeseries, config) {
   }
 
   let peakWriteRPS = 0;
+  let peakReadRPS = 0;
   let totalWriteOps = 0;
   let totalReadOps = 0;
   let totalWriteErrors = 0;
   let totalReadErrors = 0;
 
-  // Sustain-phase metrics for averages
+  // Sustain-phase metrics for write averages
   const sustainWriteOps = [];
-  const sustainReadOps = [];
   const sustainWriteP50s = [];
   const sustainWriteP99s = [];
-  const sustainReadP50s = [];
-  const sustainReadP99s = [];
+  // Read metrics across sustain + read_only phases
+  const readPhaseOps = [];
+  const readPhaseP50s = [];
+  const readPhaseP99s = [];
 
   // Per-spike accumulators
   const numSpikes = config.numSpikes || 1;
@@ -144,18 +157,21 @@ function computeSummary(timeseries, config) {
     totalWriteErrors += writeErrors;
     totalReadErrors += readErrors;
 
-    if (writeOps > peakWriteRPS) {
-      peakWriteRPS = writeOps;
-    }
+    if (writeOps > peakWriteRPS) peakWriteRPS = writeOps;
+    if (readOps > peakReadRPS) peakReadRPS = readOps;
 
-    // Sustain-phase aggregation
+    // Sustain-phase aggregation (writes)
     if (phase === 'sustain') {
       sustainWriteOps.push(writeOps);
-      sustainReadOps.push(readOps);
       sustainWriteP50s.push(writeP50);
       sustainWriteP99s.push(writeP99);
-      sustainReadP50s.push(readP50);
-      sustainReadP99s.push(readP99);
+    }
+
+    // Read metrics: aggregate from sustain + read_only phases
+    if (phase === 'sustain' || phase === 'read_only') {
+      readPhaseOps.push(readOps);
+      readPhaseP50s.push(readP50);
+      readPhaseP99s.push(readP99);
     }
 
     // Per-spike aggregation
@@ -174,17 +190,17 @@ function computeSummary(timeseries, config) {
     ? sustainWriteOps.reduce((a, b) => a + b, 0) / sustainWriteOps.length
     : 0;
 
-  const avgReadRPS = sustainReadOps.length > 0
-    ? sustainReadOps.reduce((a, b) => a + b, 0) / sustainReadOps.length
+  const avgReadRPS = readPhaseOps.length > 0
+    ? readPhaseOps.reduce((a, b) => a + b, 0) / readPhaseOps.length
     : 0;
 
   // Percentiles across all sustain-phase seconds
   const writeP50 = computePercentile(sustainWriteP50s, 50);
   const writeP90 = computePercentile(sustainWriteP99s, 90);
   const writeP99 = computePercentile(sustainWriteP99s, 99);
-  const readP50 = computePercentile(sustainReadP50s, 50);
-  const readP90 = computePercentile(sustainReadP99s, 90);
-  const readP99 = computePercentile(sustainReadP99s, 99);
+  const readP50 = computePercentile(readPhaseP50s, 50);
+  const readP90 = computePercentile(readPhaseP99s, 90);
+  const readP99 = computePercentile(readPhaseP99s, 99);
 
   const totalOps = totalWriteOps + totalReadOps;
   const totalErrors = totalWriteErrors + totalReadErrors;
@@ -204,6 +220,7 @@ function computeSummary(timeseries, config) {
 
   return {
     peakWriteRPS,
+    peakReadRPS,
     avgWriteRPS: Math.round(avgWriteRPS * 100) / 100,
     avgReadRPS: Math.round(avgReadRPS * 100) / 100,
     writeP50: Math.round(writeP50 * 100) / 100,

@@ -117,7 +117,8 @@ function generateMarkdownReport(run) {
   md += `| Write Mode | ${config.writeMode || '--'} |\n`;
   md += `| Write Concern | ${config.writeConcern || '--'} |\n`;
   md += `| Target Write RPS | ${fmt(config.targetWriteRPS, 0)} |\n`;
-  md += `| Target Read RPS | ${fmt(config.targetReadRPS, 0)} |\n`;
+  md += `| Read RPS (min/avg/max) | ${fmt(config.readRPSMin, 0)} / ${fmt(config.readRPSAvg, 0)} / ${fmt(config.readRPSMax, 0)} |\n`;
+  md += `| Read Isolation | ${config.readIsolationPct || 0}% |\n`;
   md += `| Spikes | ${config.numSpikes || '--'} |\n`;
   md += `\n`;
 
@@ -128,6 +129,7 @@ function generateMarkdownReport(run) {
   md += `| Peak Write RPS | ${fmt(summary.peakWriteRPS, 0)} |\n`;
   md += `| Avg Write RPS | ${fmt(summary.avgWriteRPS, 0)} |\n`;
   md += `| Write p50 / p90 / p99 | ${fmt(summary.writeP50)} / ${fmt(summary.writeP90)} / ${fmt(summary.writeP99)} ms |\n`;
+  md += `| Peak Read RPS | ${fmt(summary.peakReadRPS, 0)} |\n`;
   md += `| Avg Read RPS | ${fmt(summary.avgReadRPS, 0)} |\n`;
   md += `| Read p50 / p90 / p99 | ${fmt(summary.readP50)} / ${fmt(summary.readP90)} / ${fmt(summary.readP99)} ms |\n`;
   md += `| Error Rate | ${fmt(summary.errorRate)}% |\n`;
@@ -273,7 +275,7 @@ export default function ResultsPage() {
       actualWriteRPS: w.ops || 0,
       targetWriteRPS: d.targetWriteRPS || 0,
       actualReadRPS: r.ops || 0,
-      targetReadRPS: config.targetReadRPS || 0,
+      targetReadRPS: d.targetReadRPS || 0,
       writeP50: w.p50 || 0,
       writeP95: w.p95 || 0,
       writeP99: w.p99 || 0,
@@ -404,7 +406,11 @@ export default function ResultsPage() {
         <SummaryCard title="Read Performance" borderColor="#6B7280">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400">Achieved Read RPS</span>
+              <span className="text-xs text-gray-400">Peak Read RPS</span>
+              <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.peakReadRPS)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">Avg Read RPS</span>
               <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.avgReadRPS)}</span>
             </div>
             <div className="flex justify-between">
@@ -418,6 +424,32 @@ export default function ResultsPage() {
             <div className="flex justify-between">
               <span className="text-xs text-gray-400">p99</span>
               <span className="text-sm font-mono text-red-400">{fmt(summary.readP99)} ms</span>
+            </div>
+          </div>
+        </SummaryCard>
+
+        {/* Read Config Card */}
+        <SummaryCard title="Read Configuration" borderColor="#6B7280">
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">Target RPS (min/avg/max)</span>
+              <span className="text-sm text-gray-200 font-mono">
+                {fmtRPS(config.readRPSMin)} / {fmtRPS(config.readRPSAvg)} / {fmtRPS(config.readRPSMax)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">Isolation</span>
+              <span className="text-sm text-gray-200 font-mono">{config.readIsolationPct || 0}%</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">Total Read Ops</span>
+              <span className="text-sm text-gray-200 font-mono">{(summary.totalReadOps || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-400">Read Errors</span>
+              <span className={`text-sm font-mono ${(summary.totalReadErrors || 0) > 0 ? 'text-red-400' : 'text-gray-200'}`}>
+                {(summary.totalReadErrors || 0).toLocaleString()}
+              </span>
             </div>
           </div>
         </SummaryCard>

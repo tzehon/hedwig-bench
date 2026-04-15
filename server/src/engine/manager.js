@@ -14,13 +14,11 @@ const COOLDOWN_SECONDS = 60;
 function resolvePhase(second, config) {
   const { rampSeconds, sustainSeconds, gapSeconds, numSpikes } = config;
   const spikeLength = rampSeconds + sustainSeconds + COOLDOWN_SECONDS;
-  const cycleLength = spikeLength + gapSeconds;
 
   let offset = second;
 
   for (let spike = 0; spike < numSpikes; spike++) {
     const isLastSpike = spike === numSpikes - 1;
-    const thisCycleLen = isLastSpike ? spikeLength : cycleLength;
 
     if (offset < rampSeconds) return 'ramp';
     offset -= rampSeconds;
@@ -35,6 +33,16 @@ function resolvePhase(second, config) {
       if (offset < gapSeconds) return 'gap';
       offset -= gapSeconds;
     }
+  }
+
+  // After all write spikes: check for read-only isolation phase
+  const readIsolationPct = config.readIsolationPct ?? 0;
+  if (readIsolationPct > 0) {
+    const gaps = Math.max(0, numSpikes - 1) * gapSeconds;
+    const writeScheduleTime = numSpikes * spikeLength + gaps;
+    const pct = readIsolationPct / 100;
+    const extraReadOnly = Math.max(0, Math.ceil((pct * writeScheduleTime - gaps) / (1 - pct)));
+    if (offset < extraReadOnly) return 'read_only';
   }
 
   return 'complete';
@@ -102,7 +110,11 @@ export class RunManager {
       this._onStatusChange('running');
 
       // ── 1. Connect to MongoDB ──
-      const poolSize = this._config.poolSize ?? 200;
+      // Auto-size pool: at least writeLanes + readLanes + headroom for system queries
+      const writeLanes = this._config.writeConcurrency ?? 50;
+      const readLanes = this._config.readConcurrency ?? 50;
+      const minPool = writeLanes + readLanes + 20; // +20 for serverStatus, index ops, etc.
+      const poolSize = Math.max(this._config.poolSize ?? 200, minPool);
       this._client = new MongoClient(this._config.mongoUri, {
         maxPoolSize: poolSize,
       });
@@ -147,9 +159,11 @@ export class RunManager {
         0,
         Math.max(this._config.targetWriteRPS, 1),
       );
-      // Read rate limiter at a steady rate
-      const readRPS = this._config.readRPS ?? this._config.targetReadRPS ?? 100;
-      this._readRateLimiter = new RateLimiter(readRPS, readRPS);
+      // Read rate limiter — starts at the first schedule entry's read rate;
+      // the tick loop will update it each second for variable read patterns
+      const initialReadRPS = this._schedule[0]?.targetReadRPS ?? this._config.readRPSAvg ?? this._config.targetReadRPS ?? 100;
+      const maxReadRPS = this._config.readRPSMax ?? initialReadRPS;
+      this._readRateLimiter = new RateLimiter(initialReadRPS, Math.max(maxReadRPS, initialReadRPS));
 
       // ── 6. Create workers ──
       // Normalize config field names (frontend sends docSize, writeConcern as 'w:1')
@@ -209,12 +223,14 @@ export class RunManager {
         const entry = this._schedule[this._currentSecond];
         const phase = resolvePhase(this._currentSecond, this._config);
 
-        // Update metrics collector with current phase & target
+        // Update metrics collector with current phase & targets
         this._metricsCollector.phase = phase;
         this._metricsCollector.targetWriteRPS = entry.targetWriteRPS;
+        this._metricsCollector.targetReadRPS = entry.targetReadRPS;
 
-        // Update write rate limiter
+        // Update rate limiters
         this._writeRateLimiter.updateRate(entry.targetWriteRPS);
+        this._readRateLimiter.updateRate(entry.targetReadRPS);
 
         this._currentSecond++;
       }, 1000);

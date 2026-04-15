@@ -2,7 +2,7 @@
 
 MongoDB Atlas inbox workload benchmark tool with real-time dashboard, Atlas Search showcase, and Query Demo.
 
-Simulates the bursty campaign-blast write pattern of the Hedwig inbox messaging service (0 → 35k+ write ops/sec spikes) with concurrent stable reads (1.5k RPS). Provides live charts, run comparison, and interactive demos of MongoDB query and search capabilities.
+Simulates the bursty campaign-blast write pattern of the Hedwig inbox messaging service (0 → 35k+ write ops/sec spikes) with variable-rate reads (3.5k–10k RPS, configurable isolation vs concurrent). Provides live charts, run comparison, and interactive demos of MongoDB query and search capabilities.
 
 ![Architecture](https://img.shields.io/badge/stack-React%20%2B%20Express%20%2B%20MongoDB-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -54,7 +54,7 @@ React Frontend  <--- WebSocket --->  Express Backend  --- mongodb --->  Atlas Cl
 
 **Frontend pages:** Configure & Run, Live Dashboard, Results, History & Compare, Atlas Search, Query Demo
 
-**Backend engine:** Document Gen, Spike Scheduler, Write Worker (50 lanes), Read Worker (50 lanes), Token-Bucket Rate Limiter, Metrics Collector
+**Backend engine:** Document Gen, Spike Scheduler (write + read), Write Worker (50 lanes), Read Worker (50 lanes), Token-Bucket Rate Limiters, Metrics Collector
 
 **Data flow:** Frontend configures a run via REST API. Backend drives the load engine, streams per-second metrics over WebSocket to the live dashboard, and persists results to SQLite.
 
@@ -112,7 +112,7 @@ The home page presents a form with collapsible sections for all benchmark parame
 - **Spike pattern preview**: An SVG visualization updates in real time as you adjust spike parameters.
 - **Uncapped mode**: Removes the write rate limiter to find the cluster's maximum throughput.
 - **Before-run options**: Keep existing data, delete data but keep indexes, or drop the entire collection.
-- **Quick Smoke Test**: One-click preset — 1 spike, 5k write RPS, 500 read RPS, 10s ramp, 30s sustain. Takes ~100 seconds.
+- **Quick Smoke Test**: One-click preset — 1 spike, 5k write RPS, 500 constant read RPS, 10s ramp, 30s sustain. Takes ~100 seconds.
 
 **Starting a run:**
 1. Fill in the MongoDB URI (required) or set it via `VITE_MONGO_URI` in `client/.env`.
@@ -126,7 +126,7 @@ Shows real-time benchmark progress with charts updating every second via WebSock
 
 **Layout:**
 - **Top bar**: Run name/ID, elapsed time (MM:SS), current phase badge (Ramp / Sustain / Cooldown / Gap / Complete), progress bar.
-- **Throughput charts** (side-by-side): Write ops/sec actual vs target (dashed), Read ops/sec actual vs target.
+- **Throughput charts** (side-by-side): Write ops/sec actual vs target (dashed), Read ops/sec actual vs target (both dynamic).
 - **Latency charts** (side-by-side): Write latency per document (p50/p95/p99), Read latency per query (p50/p95/p99) with 50ms threshold reference line.
 - **System chart** (wide): Connection count, insert ops/sec, query ops/sec, WiredTiger dirty cache bytes. Updates every 5 seconds.
 - **Bottom bar**: Error counts and error rate percentage. Flashes red if error rate exceeds 1%.
@@ -214,14 +214,19 @@ For each query, the results show:
 | Write | Target peak RPS | `35,000` | 1,000–50,000 | Peak write ops/sec during sustain |
 | Write | Write concern | `w:majority` | — | Fixed at `w:majority` |
 | Write | Uncapped mode | `off` | on / off | Skip rate limiter to find max throughput |
-| Read | Target RPS | `1,500` | 100–5,000 | Constant read ops/sec |
+| Read | Mode | `variable` | `constant` / `variable` | **Constant**: fixed rate, concurrent with writes (legacy). **Variable**: rate varies between min/max with a read-only isolation phase. |
+| Read | Min RPS | `3,500` | 100–15,000 | Variable mode: minimum read ops/sec (floor during gaps & isolation ramp) |
+| Read | Avg RPS | `5,000` | 100–15,000 | Variable mode: target average read ops/sec across the entire run |
+| Read | Max RPS | `10,000` | 100–20,000 | Variable mode: peak read ops/sec (apex of isolation spike) |
+| Read | Isolation % | `40` | 0–80 | Variable mode: percentage of total run time that is read-only (no concurrent writes) |
+| Read | Concurrency (lanes) | `50` | 1–500 | Concurrent read lanes. Increase for high RPS targets (>5k) or high-latency setups. |
 | Spike | Number of spikes | `2` | 1–10 | How many write spikes |
 | Spike | Ramp-up (seconds) | `60` | 30–300 | Linear ramp from 0 → target RPS |
 | Spike | Sustain (seconds) | `120` | 30–600 | Hold at target RPS |
 | Spike | Gap (seconds) | `30` | 30–300 | Pause between spikes (reads continue) |
 | Actions | Before run | Keep data | Keep / Delete data / Drop collection | What to do before starting |
 
-**Quick Smoke Test** overrides: 1 spike, 5,000 write RPS, 500 read RPS, 10s ramp, 30s sustain (~100s total).
+**Quick Smoke Test** overrides: 1 spike, 5,000 write RPS, 500 constant read RPS (no isolation), 10s ramp, 30s sustain (~100s total).
 
 ---
 
@@ -229,12 +234,14 @@ For each query, the results show:
 
 ### Spike Algorithm
 
-The spike simulator controls the write worker's target RPS every second based on a pre-computed schedule.
+The spike simulator controls both the write and read workers' target RPS every second based on a pre-computed schedule.
 
-Each spike has three phases:
+#### Write spikes
+
+Each write spike has three phases:
 
 ```
-Target RPS
+Target Write RPS
     ▲
     │         ┌──────────────┐
 max │        ╱│   SUSTAIN    │╲
@@ -252,14 +259,45 @@ max │        ╱│   SUSTAIN    │╲
 2. **Sustain** (configurable, default 120s): Hold at target RPS.
 3. **Cooldown** (fixed 60s): Linear ramp from target RPS → 0.
 
-Between spikes: **Gap** (configurable, default 30s) where write target = 0. Reads continue at their constant rate throughout.
+Between spikes: **Gap** (configurable, default 30s) where write target = 0.
 
-**Total duration formula:**
+#### Read schedule
+
+Two modes are available:
+
+**Constant mode** (legacy): Reads run at a fixed rate throughout the entire benchmark, concurrent with writes. No isolation phase is appended. Useful as a simple baseline.
+
+**Variable mode** (default): Reads run throughout the entire benchmark at a variable rate (min/avg/max configurable):
+
+- **During write-active phases** (ramp/sustain/cooldown): Reads run at a computed concurrent rate, calculated to hit the target average across the full run.
+- **During gaps**: Reads run at the minimum RPS.
+- **Read-only isolation phase** (appended after all write spikes): Reads follow a triangle spike pattern (min → max → min) with no concurrent writes. The duration is sized so that total isolation time = the configured isolation percentage (default 40%).
+
 ```
-total = numSpikes × (rampSeconds + sustainSeconds + 60) + (numSpikes - 1) × gapSeconds
+Target Read RPS
+    ▲
+    │                                              ╱╲
+max │──────────────────────────────────────────────╱──╲──────────
+    │                                            ╱    ╲
+    │  ┌─────────────────────────────────┐      ╱      ╲
+avg │──│  concurrent rate (write-active) │─────╱────────╲───────
+    │  └─────────────────────────────────┘    ╱          ╲
+min │────────────────────────────────────────╱────────────╲──────
+    │        60% of run (writes on)      │    40% isolation
+  0 │───────────────────────────────────────────────────────── time
 ```
 
-Default (2 spikes): `2 × (60 + 120 + 60) + 1 × 30 = 510s ≈ 8.5 minutes`
+The concurrent read rate is automatically computed from the min/avg/max and isolation % so that the weighted average across the entire run equals the target average.
+
+#### Total duration formula
+
+```
+writeTime = numSpikes × (rampSeconds + sustainSeconds + 60) + (numSpikes - 1) × gapSeconds
+extraReadOnly = max(0, ceil((isolationPct × writeTime − gapTime) / (1 − isolationPct)))
+total = writeTime + extraReadOnly
+```
+
+Default (2 spikes, 40% isolation): `writeTime = 510s, extraReadOnly = 290s → total = 800s ≈ 13.3 minutes`
 
 ### Document Schema
 
@@ -303,7 +341,7 @@ Fixed at the **Extended** profile (4 indexes):
 
 ### Read Query Patterns
 
-The read worker randomly selects among three query patterns:
+The read worker runs at a variable rate (paced by a token-bucket rate limiter that is updated each second from the schedule) and randomly selects among three query patterns:
 
 | Pattern | Weight | MongoDB Query |
 |---------|--------|---------------|
@@ -359,14 +397,15 @@ Connect to `ws://localhost:3001/ws/runs/:id` to receive real-time metrics during
     "second": 42,
     "phase": "sustain",
     "targetWriteRPS": 35000,
+    "targetReadRPS": 4036,
     "write": { "ops": 34890, "errors": 0, "p50": 0.2, "p95": 0.4, "p99": 1.9 },
-    "read": { "ops": 1498, "errors": 0, "p50": 2.1, "p95": 5.4, "p99": 9.2 },
-    "system": { "connections": 187, "insertOps": 34800, "queryOps": 1490, "cacheDirtyBytes": 1048576 }
+    "read": { "ops": 4011, "errors": 0, "p50": 2.1, "p95": 5.4, "p99": 9.2 },
+    "system": { "connections": 187, "insertOps": 34800, "queryOps": 4002, "cacheDirtyBytes": 1048576 }
   }
 }
 ```
 
-Write latencies are **per document** (batch time ÷ batch size). System `insertOps` and `queryOps` are per-second rates (delta from `serverStatus` opcounters).
+Write latencies are **per document** (batch time ÷ batch size). `targetReadRPS` changes each second based on the schedule (concurrent rate during writes, variable during isolation). System `insertOps` and `queryOps` are per-second rates (delta from `serverStatus` opcounters).
 
 ---
 
@@ -379,11 +418,11 @@ The load generation engine lives in `server/src/engine/`:
 | **Document Generator** | `document.js` | Generates inbox documents with exact KB sizing. Uses pre-built padding block and `Math.random` for fast generation (~0.5ms per 500-doc batch). |
 | **Index Setup** | `indexes.js` | Creates 4 indexes (Extended profile). Uses `createIndexes` for idempotent batch creation. |
 | **Rate Limiter** | `rateLimiter.js` | Token-bucket with monotonic-clock-based 10ms refill. Supports dynamic rate updates. Bucket size tracks current rate to prevent burst overshoot. |
-| **Spike Scheduler** | `spike.js` | Pre-computes the run schedule as `{ second, targetWriteRPS }` entries. Also used client-side for spike preview SVG. |
+| **Spike Scheduler** | `spike.js` | Pre-computes the run schedule as `{ second, targetWriteRPS, targetReadRPS }` entries. Calculates isolation phase duration and concurrent read rate. Also used client-side for spike preview SVG. |
 | **Write Worker** | `writer.js` | 50 concurrent lanes. Each lane: acquire tokens → generate docs → `insertMany`/`insertOne` → record per-doc latency. Supports uncapped mode (bypasses rate limiter). |
-| **Read Worker** | `reader.js` | 50 concurrent lanes. Each lane picks a random query pattern (point read 30%, recent messages 40%, filtered inbox 30%). |
+| **Read Worker** | `reader.js` | 50 concurrent lanes. Each lane picks a random query pattern (point read 30%, recent messages 40%, filtered inbox 30%). Rate dynamically updated each second from the schedule. |
 | **Metrics Collector** | `metrics.js` | Every second: drains worker accumulators, sorts latencies once, computes p50/p95/p99. Every 5 seconds: `serverStatus` for system metrics (per-second deltas). |
-| **Run Manager** | `manager.js` | Orchestrates: connect → (delete data / drop collection) → create indexes → generate schedule → start workers → tick loop → cleanup. |
+| **Run Manager** | `manager.js` | Orchestrates: connect → (delete data / drop collection) → create indexes → generate schedule → start workers → tick loop (updates both write and read rate limiters each second) → cleanup. |
 
 **Concurrency model**: Async concurrency pools (not `worker_threads`). 50 write lanes + 50 read lanes sharing a connection pool of 200. At 35k RPS with batch 500, the client uses ~4% CPU for doc generation — the rest is async IO.
 
@@ -526,7 +565,7 @@ hedwig-bench/
 │       │   └── QueryPage.jsx       # Query Demo (3 patterns, explain, index used)
 │       └── lib/
 │           ├── api.js              # REST client (fetch) + WebSocket factory
-│           └── spike.js            # Client-side schedule generator (for previews)
+│           └── spike.js            # Client-side schedule generator (write + read, for previews)
 │
 ├── server/                         # Express backend
 │   ├── package.json
@@ -542,7 +581,7 @@ hedwig-bench/
 │           ├── document.js         # Document generator (pre-built padding, Math.random)
 │           ├── indexes.js          # Extended index profile (4 indexes)
 │           ├── rateLimiter.js      # Token-bucket (monotonic clock, dynamic rate)
-│           ├── spike.js            # Schedule generator (ramp/sustain/cooldown/gap)
+│           ├── spike.js            # Schedule generator (write spikes + read isolation phase)
 │           ├── writer.js           # Write worker (50 lanes, bulk/single, uncapped mode)
 │           ├── reader.js           # Read worker (50 lanes, 3 query patterns)
 │           ├── metrics.js          # Per-second + system metrics (per-doc latency)

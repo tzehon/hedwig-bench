@@ -267,7 +267,7 @@ export default function HistoryPage() {
               actualWriteRPS: w.ops || 0,
               targetWriteRPS: d.targetWriteRPS || 0,
               actualReadRPS: r.ops || 0,
-              targetReadRPS: config.targetReadRPS || 0,
+              targetReadRPS: d.targetReadRPS || 0,
               writeP50: w.p50 || 0,
               writeP95: w.p95 || 0,
               writeP99: w.p99 || 0,
