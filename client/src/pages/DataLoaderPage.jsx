@@ -118,6 +118,7 @@ export default function DataLoaderPage() {
   const [writeConcern, setWriteConcern] = useState('1');
   const [threadCount, setThreadCount] = useState(4);
   const [concurrencyPerThread, setConcurrencyPerThread] = useState(10);
+  const [dropBefore, setDropBefore] = useState(false);
 
   // Document preview
   const [docPreview, setDocPreview] = useState(null);
@@ -202,10 +203,11 @@ export default function DataLoaderPage() {
     }
 
     const totalDataSize = totalDocs * docSize * 1024;
-    const proceed = window.confirm(
-      `This will insert ${formatNumber(totalDocs)} documents (${formatBytes(totalDataSize)}) into '${collectionName}'. Continue?`
-    );
-    if (!proceed) return;
+    if (dropBefore) {
+      if (!window.confirm(`This will DROP the '${collectionName}' collection and then insert ${formatNumber(totalDocs)} documents (${formatBytes(totalDataSize)}). Continue?`)) return;
+    } else {
+      if (!window.confirm(`This will insert ${formatNumber(totalDocs)} documents (${formatBytes(totalDataSize)}) into '${collectionName}'. Continue?`)) return;
+    }
 
     try {
       setSubmitting(true);
@@ -214,6 +216,7 @@ export default function DataLoaderPage() {
         dbName,
         collectionName,
         deploymentMode,
+        dropCollection: dropBefore,
         totalDocs,
         docSizeKB: docSize,
         userPoolSize,
@@ -324,6 +327,11 @@ export default function DataLoaderPage() {
             </p>
           )}
         </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={dropBefore} onChange={(e) => setDropBefore(e.target.checked)} className="accent-emerald-500 w-4 h-4" />
+          <span className="text-sm text-gray-300">Drop collection before loading</span>
+          <span className="text-xs text-gray-500">(removes all existing data + indexes)</span>
+        </label>
       </Section>
 
       {/* ── Document Configuration ── */}

@@ -43,6 +43,24 @@ router.post('/start', async (req, res) => {
     const collectionName = config.collectionName || 'inbox';
     const deploymentMode = config.deploymentMode || 'replicaSet';
 
+    // Drop collection if requested
+    if (config.dropCollection) {
+      let client;
+      try {
+        client = new MongoClient(config.mongoUri);
+        await client.connect();
+        const db = client.db(dbName);
+        await db.collection(collectionName).drop();
+      } catch (err) {
+        // Collection may not exist — that's fine
+        if (err.codeName !== 'NamespaceNotFound') {
+          console.error('Drop collection warning:', err.message);
+        }
+      } finally {
+        if (client) try { await client.close(); } catch {}
+      }
+    }
+
     // Set up sharding if needed (before bulk insert)
     if (deploymentMode === 'sharded') {
       let client;
