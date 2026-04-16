@@ -5,6 +5,7 @@ const navItems = [
   { path: '/history', label: 'Run History' },
   { path: '/search', label: 'Atlas Search' },
   { path: '/queries', label: 'Query Demo' },
+  { path: '/loader', label: 'Data Loader' },
 ];
 
 export default function App() {

@@ -54,3 +54,27 @@ export function createWebSocket(runId) {
   const host = window.location.host;
   return new WebSocket(`${protocol}//${host}/ws/runs/${runId}`);
 }
+
+// ── Data Loader API ──
+
+export function startLoaderJob(config) {
+  return request('/loader/start', { method: 'POST', body: JSON.stringify(config) });
+}
+
+export function stopLoaderJob(jobId) {
+  return request(`/loader/stop/${jobId}`, { method: 'POST' });
+}
+
+export function getLoaderStatus(jobId) {
+  return request(`/loader/status/${jobId}`);
+}
+
+export function previewLoaderDoc(docSize, userPoolSize) {
+  return request(`/loader/preview-doc?docSize=${docSize}&userPoolSize=${userPoolSize || 100000}`);
+}
+
+export function createLoaderWebSocket(jobId) {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return new WebSocket(`${protocol}//${host}/ws/loader/${jobId}`);
+}

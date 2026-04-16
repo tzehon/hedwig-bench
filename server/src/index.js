@@ -11,6 +11,7 @@ import { initDatabase } from './db/database.js';
 import runsRouter, { setBroadcastFunctions, getActiveRuns } from './routes/runs.js';
 import searchRouter, { disconnect as disconnectSearch } from './routes/search.js';
 import queriesRouter, { disconnect as disconnectQueries } from './routes/queries.js';
+import loaderRouter, { setLoaderBroadcast, getActiveJobs as getActiveLoaderJobs } from './routes/loader.js';
 
 const PORT = 3001;
 
@@ -35,6 +36,7 @@ app.use(express.json());
 app.use('/api/runs', runsRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/queries', queriesRouter);
+app.use('/api/loader', loaderRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -64,6 +66,8 @@ const server = createServer(app);
 
 /** Map of run ID -> Set<WebSocket> */
 const wsClients = new Map();
+/** Map of loader job ID -> Set<WebSocket> */
+const loaderWsClients = new Map();
 
 const wss = new WebSocketServer({ noServer: true });
 
@@ -79,46 +83,44 @@ server.on('upgrade', (request, socket, head) => {
     return;
   }
 
-  const match = pathname.match(/^\/ws\/runs\/([a-f0-9-]+)$/i);
-  if (!match) {
+  const runMatch = pathname.match(/^\/ws\/runs\/([a-f0-9-]+)$/i);
+  const loaderMatch = pathname.match(/^\/ws\/loader\/([a-f0-9-]+)$/i);
+
+  if (!runMatch && !loaderMatch) {
     socket.destroy();
     return;
   }
 
-  const runId = match[1];
+  const id = runMatch ? runMatch[1] : loaderMatch[1];
+  const namespace = runMatch ? 'run' : 'loader';
 
   wss.handleUpgrade(request, socket, head, (ws) => {
-    wss.emit('connection', ws, request, runId);
+    wss.emit('connection', ws, request, { id, namespace });
   });
 });
 
-wss.on('connection', (ws, _request, runId) => {
-  // Add this client to the run's client set
-  if (!wsClients.has(runId)) {
-    wsClients.set(runId, new Set());
-  }
-  wsClients.get(runId).add(ws);
+wss.on('connection', (ws, _request, { id, namespace }) => {
+  const clientMap = namespace === 'loader' ? loaderWsClients : wsClients;
 
-  // Handle client disconnect
+  if (!clientMap.has(id)) {
+    clientMap.set(id, new Set());
+  }
+  clientMap.get(id).add(ws);
+
   ws.on('close', () => {
-    const clients = wsClients.get(runId);
+    const clients = clientMap.get(id);
     if (clients) {
       clients.delete(ws);
-      if (clients.size === 0) {
-        wsClients.delete(runId);
-      }
+      if (clients.size === 0) clientMap.delete(id);
     }
   });
 
-  // Handle errors gracefully
   ws.on('error', (err) => {
-    console.error(`WebSocket error for run ${runId}:`, err.message);
-    const clients = wsClients.get(runId);
+    console.error(`WebSocket error for ${namespace} ${id}:`, err.message);
+    const clients = clientMap.get(id);
     if (clients) {
       clients.delete(ws);
-      if (clients.size === 0) {
-        wsClients.delete(runId);
-      }
+      if (clients.size === 0) clientMap.delete(id);
     }
   });
 });
@@ -165,6 +167,19 @@ function broadcastStatusChange(runId, statusData) {
 // Inject broadcast functions into the runs router
 setBroadcastFunctions(broadcastMetrics, broadcastStatusChange);
 
+/**
+ * Broadcast loader progress to all WebSocket clients for a given job.
+ */
+function broadcastLoaderProgress(jobId, message) {
+  const clients = loaderWsClients.get(jobId);
+  if (!clients || clients.size === 0) return;
+  for (const ws of clients) {
+    safeSend(ws, message);
+  }
+}
+
+setLoaderBroadcast(broadcastLoaderProgress);
+
 // ────────────────────────────────────────────────────────────
 // 5. Start listening
 // ────────────────────────────────────────────────────────────
@@ -179,9 +194,11 @@ server.listen(PORT, () => {
 async function shutdown() {
   console.log('\nShutting down gracefully...');
 
-  // Stop all active runs
+  // Stop all active runs and loader jobs
   const activeRuns = getActiveRuns();
+  const activeLoaderJobs = getActiveLoaderJobs();
   const stopPromises = [];
+
   for (const [runId, manager] of activeRuns) {
     console.log(`Stopping active run: ${runId}`);
     stopPromises.push(
@@ -190,6 +207,16 @@ async function shutdown() {
       }),
     );
   }
+
+  for (const [jobId, job] of activeLoaderJobs) {
+    console.log(`Stopping loader job: ${jobId}`);
+    stopPromises.push(
+      job.pool.stop().catch((err) => {
+        console.error(`Error stopping loader job ${jobId}:`, err.message);
+      }),
+    );
+  }
+
   await Promise.allSettled(stopPromises);
 
   // Close search connection
@@ -197,16 +224,16 @@ async function shutdown() {
   await disconnectQueries().catch(() => {});
 
   // Close all WebSocket connections
-  for (const [runId, clients] of wsClients) {
-    for (const ws of clients) {
-      try {
-        ws.close(1001, 'Server shutting down');
-      } catch {
-        // Ignore close errors
+  for (const clientMap of [wsClients, loaderWsClients]) {
+    for (const [, clients] of clientMap) {
+      for (const ws of clients) {
+        try {
+          ws.close(1001, 'Server shutting down');
+        } catch {}
       }
     }
+    clientMap.clear();
   }
-  wsClients.clear();
 
   // Close the WebSocket server
   wss.close(() => {

@@ -8,6 +8,7 @@ import ResultsPage from './pages/ResultsPage';
 import HistoryPage from './pages/HistoryPage';
 import SearchPage from './pages/SearchPage';
 import QueryPage from './pages/QueryPage';
+import DataLoaderPage from './pages/DataLoaderPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -21,6 +22,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="history" element={<HistoryPage />} />
           <Route path="search" element={<SearchPage />} />
           <Route path="queries" element={<QueryPage />} />
+          <Route path="loader" element={<DataLoaderPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
