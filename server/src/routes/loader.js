@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { MongoClient } from 'mongodb';
 import { generateDocument } from '../engine/document.js';
-import { setupSharding } from '../engine/indexes.js';
+import { setupIndexes, setupSharding } from '../engine/indexes.js';
 import { InsertWorkerPool } from '../engine/insertWorkerPool.js';
 
 const router = Router();
@@ -100,8 +100,22 @@ router.post('/start', async (req, res) => {
           broadcastProgress(jobId, { type: 'progress', data: { jobId, ...progress } });
         }
       },
-      // onComplete
-      (result) => {
+      // onComplete — create indexes after insertion, then broadcast final status
+      async (result) => {
+        // Create benchmark indexes on the loaded data
+        try {
+          const client = new MongoClient(config.mongoUri);
+          await client.connect();
+          const db = client.db(dbName);
+          const col = db.collection(collectionName);
+          await setupIndexes(col, 'extended');
+          await client.close();
+          result.indexesCreated = true;
+        } catch (err) {
+          console.error(`Failed to create indexes for job ${jobId}:`, err.message);
+          result.indexesCreated = false;
+        }
+
         if (broadcastProgress) {
           broadcastProgress(jobId, { type: 'status', data: { jobId, ...result } });
         }
