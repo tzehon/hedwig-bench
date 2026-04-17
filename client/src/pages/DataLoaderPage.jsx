@@ -181,6 +181,9 @@ export default function DataLoaderPage() {
         const msg = JSON.parse(event.data);
         if (msg.type === 'progress') {
           setProgress(msg.data);
+          if (msg.data.status === 'building_indexes') {
+            setJobStatus('building_indexes');
+          }
         } else if (msg.type === 'status') {
           setProgress(msg.data);
           setJobStatus(msg.data.status);
@@ -287,7 +290,7 @@ export default function DataLoaderPage() {
     }
   }, [mongoUri, dbName, collectionName, deploymentMode]);
 
-  const isRunning = jobStatus === 'running';
+  const isRunning = jobStatus === 'running' || jobStatus === 'building_indexes';
   const isFinished = jobStatus === 'completed' || jobStatus === 'stopped' || jobStatus === 'failed';
   const maskedUri = mongoUri.length > 20 ? mongoUri.slice(0, 20) + '...' : mongoUri;
   const totalDataSize = totalDocs * docSize * 1024;

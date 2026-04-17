@@ -102,18 +102,28 @@ router.post('/start', async (req, res) => {
       },
       // onComplete — create indexes after insertion, then broadcast final status
       async (result) => {
+        // Broadcast insertion complete, indexes building
+        if (broadcastProgress) {
+          broadcastProgress(jobId, {
+            type: 'progress',
+            data: { jobId, ...result, status: 'building_indexes' },
+          });
+        }
+
         // Create benchmark indexes on the loaded data
+        let indexClient;
         try {
-          const client = new MongoClient(config.mongoUri);
-          await client.connect();
-          const db = client.db(dbName);
+          indexClient = new MongoClient(config.mongoUri);
+          await indexClient.connect();
+          const db = indexClient.db(dbName);
           const col = db.collection(collectionName);
           await setupIndexes(col, 'extended');
-          await client.close();
           result.indexesCreated = true;
         } catch (err) {
           console.error(`Failed to create indexes for job ${jobId}:`, err.message);
           result.indexesCreated = false;
+        } finally {
+          if (indexClient) try { await indexClient.close(); } catch {}
         }
 
         if (broadcastProgress) {
