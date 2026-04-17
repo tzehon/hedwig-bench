@@ -101,6 +101,8 @@ export default function LiveDashboard() {
     targetReadRPS: 0,
     writeErrors: 0,
     readErrors: 0,
+    mutationRPS: 0,
+    mutationErrors: 0,
     errorRate: 0,
   });
 
@@ -163,6 +165,7 @@ export default function LiveDashboard() {
             const d = msg.data;
             const w = d.write || {};
             const r = d.read || {};
+            const m = d.mutation || {};
             const sys = d.system || {};
 
             // Build a data point for the throughput/latency charts
@@ -194,8 +197,8 @@ export default function LiveDashboard() {
             }
 
             // Update current stats
-            const totalOps = (w.ops || 0) + (r.ops || 0);
-            const totalErrors = (w.errors || 0) + (r.errors || 0);
+            const totalOps = (w.ops || 0) + (r.ops || 0) + (m.ops || 0);
+            const totalErrors = (w.errors || 0) + (r.errors || 0) + (m.errors || 0);
             setCurrentStats({
               elapsedSeconds: d.second || 0,
               phase: d.phase || 'ramp',
@@ -206,6 +209,8 @@ export default function LiveDashboard() {
               targetReadRPS: d.targetReadRPS || 0,
               writeErrors: w.errors || 0,
               readErrors: r.errors || 0,
+              mutationRPS: m.ops || 0,
+              mutationErrors: m.errors || 0,
               errorRate: totalOps > 0 ? (totalErrors / totalOps) * 100 : 0,
             });
           }
@@ -826,6 +831,12 @@ export default function LiveDashboard() {
                 currentStats.readErrors > 0 ? 'text-red-400' : 'text-gray-100'
               }`}>
                 {currentStats.readErrors.toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <span className="text-xs text-gray-400">Mutations/s</span>
+              <p className="text-lg font-mono font-semibold text-gray-100">
+                {currentStats.mutationRPS.toLocaleString()}
               </p>
             </div>
             <div>

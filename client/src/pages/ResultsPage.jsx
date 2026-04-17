@@ -467,6 +467,32 @@ export default function ResultsPage() {
             </div>
           </div>
         </SummaryCard>
+
+        {/* Mutations Card */}
+        {(summary.totalMutationOps > 0 || summary.avgMutationRPS > 0) && (
+          <SummaryCard title="Mutations" borderColor="#f59e0b">
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-400">Avg RPS</span>
+                <span className="text-sm text-gray-100 font-mono font-semibold">{fmtRPS(summary.avgMutationRPS)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-400">Total Ops</span>
+                <span className="text-sm text-gray-200 font-mono">{(summary.totalMutationOps || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-400">p99</span>
+                <span className="text-sm font-mono text-red-400">{fmt(summary.mutationP99)} ms</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-400">Errors</span>
+                <span className={`text-sm font-mono ${(summary.totalMutationErrors || 0) > 0 ? 'text-red-400' : 'text-gray-200'}`}>
+                  {(summary.totalMutationErrors || 0).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </SummaryCard>
+        )}
       </div>
 
       {/* ============================================================= */}

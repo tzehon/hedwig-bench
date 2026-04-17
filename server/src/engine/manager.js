@@ -2,6 +2,7 @@ import { MongoClient } from 'mongodb';
 import { RateLimiter } from './rateLimiter.js';
 import { WriteWorker } from './writer.js';
 import { ReadWorkerPool } from './readWorkerPool.js';
+import { MutationWorker } from './mutationWorker.js';
 import { MetricsCollector } from './metrics.js';
 import { setupIndexes, setupSharding } from './indexes.js';
 import { generateSchedule, getTotalDurationSeconds } from './spike.js';
@@ -87,8 +88,10 @@ export class RunManager {
     this._db = null;
     this._collection = null;
     this._writeRateLimiter = null;
+    this._mutationRateLimiter = null;
     this._writer = null;
     this._reader = null;
+    this._mutation = null;
     this._metricsCollector = null;
     this._schedule = null;
     this._tickTimer = null;
@@ -199,11 +202,21 @@ export class RunManager {
         threadCount: this._config.readWorkerThreads ?? 4,
       });
 
-      // ── 8. Create metrics collector ──
+      // ── 8. Create mutation worker (updates + deletes on existing docs) ──
+      // Avg ~1480/sec total: status update 80, delete 600, content update 800
+      const mutationRPS = this._config.mutationRPS ?? 1480;
+      this._mutationRateLimiter = new RateLimiter(mutationRPS, mutationRPS);
+      this._mutation = new MutationWorker(this._collection, this._mutationRateLimiter, {
+        userPoolSize: this._config.userPoolSize,
+        concurrency: 10,
+      });
+
+      // ── 9. Create metrics collector ──
       this._metricsCollector = new MetricsCollector(
         this._writer,
         this._reader,
         this._db,
+        this._mutation,
       );
       this._metricsCollector.onMetrics = (snapshot) => {
         if (this._onMetrics) {
@@ -215,10 +228,12 @@ export class RunManager {
         }
       };
 
-      // ── 9. Pre-seed reader cache & start everything ──
+      // ── 10. Pre-seed caches & start everything ──
       await this._reader.seedCache();
+      await this._mutation.seedCache();
       this._writer.start();
       this._reader.start();
+      this._mutation.start();
       this._metricsCollector.start();
 
       this._startTime = Date.now();
@@ -245,6 +260,10 @@ export class RunManager {
         // Update write rate limiter + read worker pool rate
         this._writeRateLimiter.updateRate(entry.targetWriteRPS);
         this._reader.updateRate(entry.targetReadRPS);
+
+        // Mutations run during concurrent phase only (they are write ops)
+        const mutationRPS = this._config.mutationRPS ?? 1480;
+        this._mutationRateLimiter.updateRate(entry.targetWriteRPS > 0 ? mutationRPS : 0);
 
         // Switch read query patterns based on phase
         // Concurrent (writes active): point reads (1 item)
@@ -300,13 +319,15 @@ export class RunManager {
       this._tickTimer = null;
     }
 
-    // Stop write rate limiter (read rate limiters are in worker threads)
+    // Stop rate limiters
     if (this._writeRateLimiter) this._writeRateLimiter.stop();
+    if (this._mutationRateLimiter) this._mutationRateLimiter.stop();
 
     // Stop workers (waits for in-flight ops)
     const workerStops = [];
     if (this._writer) workerStops.push(this._writer.stop());
     if (this._reader) workerStops.push(this._reader.stop());
+    if (this._mutation) workerStops.push(this._mutation.stop());
     await Promise.allSettled(workerStops);
 
     // Stop metrics collector

@@ -112,6 +112,9 @@ function computeSummary(timeseries, config) {
   let totalReadOps = 0;
   let totalWriteErrors = 0;
   let totalReadErrors = 0;
+  let totalMutationOps = 0;
+  let totalMutationErrors = 0;
+  const mutationP99s = [];
 
   // Sustain-phase metrics for write averages
   const sustainWriteOps = [];
@@ -147,10 +150,17 @@ function computeSummary(timeseries, config) {
     const writeP50 = entry.write?.p50 ?? 0;
     const readP50 = entry.read?.p50 ?? 0;
 
+    const mutationOps = entry.mutation?.ops ?? 0;
+    const mutationErrors = entry.mutation?.errors ?? 0;
+    const mutationP99 = entry.mutation?.p99 ?? 0;
+
     totalWriteOps += writeOps;
     totalReadOps += readOps;
     totalWriteErrors += writeErrors;
     totalReadErrors += readErrors;
+    totalMutationOps += mutationOps;
+    totalMutationErrors += mutationErrors;
+    if (phase === 'sustain' && mutationP99 > 0) mutationP99s.push(mutationP99);
 
     if (writeOps > peakWriteRPS) peakWriteRPS = writeOps;
     if (readOps > peakReadRPS) peakReadRPS = readOps;
@@ -254,6 +264,10 @@ function computeSummary(timeseries, config) {
     totalReadOps,
     totalWriteErrors,
     totalReadErrors,
+    totalMutationOps,
+    totalMutationErrors,
+    avgMutationRPS: r(totalMutationOps / (timeseries.length || 1)),
+    mutationP99: r(computePercentile(mutationP99s, 99)),
     errorRate: Math.round(errorRate * 1000) / 1000,
     perSpike,
   };

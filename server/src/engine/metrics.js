@@ -26,9 +26,10 @@ export class MetricsCollector {
    * @param {import('./reader.js').ReadWorker} reader
    * @param {import('mongodb').Db} db - MongoDB database handle (for serverStatus)
    */
-  constructor(writer, reader, db) {
+  constructor(writer, reader, db, mutationWorker) {
     this._writer = writer;
     this._reader = reader;
+    this._mutation = mutationWorker;
     this._db = db;
     this._running = false;
 
@@ -76,11 +77,13 @@ export class MetricsCollector {
 
     const writerMetrics = this._writer.drainMetrics();
     const readerMetrics = this._reader.drainMetrics();
+    const mutationMetrics = this._mutation ? this._mutation.drainMetrics() : { ops: 0, errors: 0, latencies: [] };
 
     // Sort once, then compute all percentiles from the sorted array
     const wLat = sortLatencies(writerMetrics.latencies);       // per-doc
     const wBatch = sortLatencies(writerMetrics.batchLatencies); // per-batch
     const rLat = sortLatencies(readerMetrics.latencies);
+    const mLat = sortLatencies(mutationMetrics.latencies);
 
     const snapshot = {
       second: this._second,
@@ -104,6 +107,13 @@ export class MetricsCollector {
         p50: percentile(rLat, 50),
         p95: percentile(rLat, 95),
         p99: percentile(rLat, 99),
+      },
+      mutation: {
+        ops: mutationMetrics.ops,
+        errors: mutationMetrics.errors,
+        p50: percentile(mLat, 50),
+        p95: percentile(mLat, 95),
+        p99: percentile(mLat, 99),
       },
       system: this._latestSystem,
     };
