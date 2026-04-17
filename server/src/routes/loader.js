@@ -172,6 +172,37 @@ router.get('/status/:jobId', (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────
+// POST /api/loader/create-indexes — Create benchmark indexes on demand
+// ────────────────────────────────────────────────────────────
+router.post('/create-indexes', async (req, res) => {
+  const { mongoUri, dbName, collectionName, deploymentMode } = req.body || {};
+  if (!mongoUri || !dbName || !collectionName) {
+    return res.status(400).json({ error: 'mongoUri, dbName, and collectionName are required' });
+  }
+
+  let client;
+  try {
+    client = new MongoClient(mongoUri);
+    await client.connect();
+    const db = client.db(dbName);
+    const col = db.collection(collectionName);
+
+    // Set up sharding first if needed
+    if (deploymentMode === 'sharded') {
+      await setupSharding(db, collectionName);
+    }
+
+    const count = await setupIndexes(col, 'extended');
+    res.json({ ok: true, count });
+  } catch (err) {
+    console.error('Error creating indexes:', err.message);
+    res.status(500).json({ error: `Failed to create indexes: ${err.message}` });
+  } finally {
+    if (client) try { await client.close(); } catch {}
+  }
+});
+
+// ────────────────────────────────────────────────────────────
 // GET /api/loader/preview-doc — Generate a sample document
 // ────────────────────────────────────────────────────────────
 router.get('/preview-doc', (req, res) => {

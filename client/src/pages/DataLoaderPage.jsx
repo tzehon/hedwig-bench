@@ -125,6 +125,10 @@ export default function DataLoaderPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const previewTimerRef = useRef(null);
 
+  // Index creation
+  const [creatingIndexes, setCreatingIndexes] = useState(false);
+  const [indexResult, setIndexResult] = useState(null);
+
   // Job state
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null); // running | completed | stopped | failed
@@ -261,6 +265,27 @@ export default function DataLoaderPage() {
       wsRef.current = null;
     }
   }, []);
+
+  // Create indexes on demand
+  const handleCreateIndexes = useCallback(async () => {
+    if (!mongoUri) { alert('MongoDB URI is required.'); return; }
+    try {
+      setCreatingIndexes(true);
+      setIndexResult(null);
+      const res = await fetch('/api/loader/create-indexes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mongoUri, dbName, collectionName, deploymentMode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setIndexResult(data);
+    } catch (err) {
+      alert(`Failed to create indexes: ${err.message}`);
+    } finally {
+      setCreatingIndexes(false);
+    }
+  }, [mongoUri, dbName, collectionName, deploymentMode]);
 
   const isRunning = jobStatus === 'running';
   const isFinished = jobStatus === 'completed' || jobStatus === 'stopped' || jobStatus === 'failed';
@@ -442,6 +467,21 @@ export default function DataLoaderPage() {
             >New Job</button>
           </div>
         )}
+
+        <div className="border-t border-gray-700 pt-4 mt-2">
+          <button type="button" onClick={handleCreateIndexes} disabled={creatingIndexes || isRunning}
+            className="px-5 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-200 text-sm font-medium rounded-md transition-colors"
+          >
+            {creatingIndexes ? 'Creating indexes...' : 'Create Indexes'}
+          </button>
+          <span className="text-xs text-gray-500 ml-3">
+            Creates the 4 benchmark indexes (point read, recent inbox, TTL, filtered inbox)
+            {deploymentMode === 'sharded' && ' + shard key index'}
+          </span>
+          {indexResult && (
+            <p className="text-xs text-green-400 mt-1">Indexes created ({indexResult.count} indexes)</p>
+          )}
+        </div>
       </Section>
 
       {/* ── Progress ── */}
