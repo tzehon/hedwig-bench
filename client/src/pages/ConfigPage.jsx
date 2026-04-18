@@ -288,7 +288,7 @@ export default function ConfigPage() {
   const [readIsolationPct, setReadIsolationPct] = useState(40);
   const [readLanes, setReadLanes] = useState(150);
   const [readWorkerThreads, setReadWorkerThreads] = useState(4);
-  const [zipfExponent, setZipfExponent] = useState(0);
+  const [zipfExponent, setZipfExponent] = useState(1.0);
 
   // -- Spike Pattern --
   const [numSpikes, setNumSpikes] = useState(1);
