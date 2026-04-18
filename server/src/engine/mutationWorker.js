@@ -10,6 +10,8 @@
  * All operations use the { user_id: 1, msg_id: 1 } index (no new indexes needed).
  */
 
+import { UserSelector } from './userSelector.js';
+
 const DEFAULT_CONCURRENCY = 10;
 const STATUSES = ['delivered', 'read', 'unread'];
 
@@ -54,6 +56,7 @@ export class MutationWorker {
     this._config = config;
     /** @type {Map<string, string>} */
     this._knownMsgIds = new Map();
+    this._userSelector = new UserSelector(config.userPoolSize, config.zipfExponent ?? 0);
     this._stopped = false;
     this._running = false;
 
@@ -98,8 +101,6 @@ export class MutationWorker {
   }
 
   async _runLane() {
-    const { userPoolSize } = this._config;
-
     while (!this._stopped) {
       try {
         // Sleep if rate is 0 (isolation phase — mutations don't run)
@@ -110,9 +111,7 @@ export class MutationWorker {
 
         await this._rateLimiter.acquire(1);
 
-        // Pick a random user with a known msg_id
-        const num = 1 + Math.floor(Math.random() * userPoolSize);
-        const userId = `user_${String(num).padStart(6, '0')}`;
+        const userId = this._userSelector.pickUserId();
         const msgId = this._knownMsgIds.get(userId);
 
         // Skip if no cached msg_id — can't mutate a doc we don't know exists

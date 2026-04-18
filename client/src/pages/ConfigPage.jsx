@@ -288,6 +288,7 @@ export default function ConfigPage() {
   const [readIsolationPct, setReadIsolationPct] = useState(40);
   const [readLanes, setReadLanes] = useState(150);
   const [readWorkerThreads, setReadWorkerThreads] = useState(4);
+  const [zipfExponent, setZipfExponent] = useState(0);
 
   // -- Spike Pattern --
   const [numSpikes, setNumSpikes] = useState(1);
@@ -348,6 +349,7 @@ export default function ConfigPage() {
       readIsolationPct,
       readConcurrency: readLanes,
       readWorkerThreads,
+      zipfExponent,
       numSpikes,
       rampSeconds,
       sustainSeconds,
@@ -359,7 +361,7 @@ export default function ConfigPage() {
     [
       runName, mongoUri, dbName, collectionName, poolSize, deploymentMode, docSize, userPoolSize,
       indexProfile, writeMode, batchSize, targetWriteRPS, writeConcern, uncapped, writeLanes,
-      readRPSConcurrent, readRPSIsolation, readIsolationPct, readLanes, readWorkerThreads,
+      readRPSConcurrent, readRPSIsolation, readIsolationPct, readLanes, readWorkerThreads, zipfExponent,
       numSpikes, rampSeconds, sustainSeconds, gapSeconds,
       dropMode,
     ],
@@ -797,6 +799,25 @@ export default function ConfigPage() {
             </p>
           </div>
         </div>
+
+        <RangeSlider
+          id="zipfExponent"
+          value={zipfExponent}
+          onChange={(e) => setZipfExponent(Number(e.target.value))}
+          min={0}
+          max={1.5}
+          step={0.1}
+          label="Read skew (Zipf exponent)"
+        />
+        <p className="text-xs text-gray-500">
+          {zipfExponent === 0
+            ? '0 = uniform random (all users equally likely — worst case for cache)'
+            : zipfExponent <= 0.5
+            ? `${zipfExponent} = mild skew (some users read more often)`
+            : zipfExponent <= 1.0
+            ? `${zipfExponent} = standard Zipf (top 20% of users generate ~80% of reads — realistic)`
+            : `${zipfExponent} = heavy skew (a few users dominate reads — hot cache)`}
+        </p>
       </Section>
 
       {/* ---------------------------------------------------------------- */}

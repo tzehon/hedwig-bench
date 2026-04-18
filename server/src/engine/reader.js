@@ -1,4 +1,5 @@
 // Use Math.random for speed — crypto randomness not needed for benchmark data
+import { UserSelector } from './userSelector.js';
 
 const DEFAULT_CONCURRENCY = 50;
 
@@ -36,6 +37,7 @@ export class ReadWorker {
     this.latencies = [];
 
     this._concurrency = config.concurrency ?? DEFAULT_CONCURRENCY;
+    this._userSelector = new UserSelector(config.userPoolSize, config.zipfExponent ?? 0);
 
     /**
      * Controls query pattern selection. Set by RunManager each tick.
@@ -88,15 +90,11 @@ export class ReadWorker {
    * A single concurrent read lane.
    */
   async _runLane() {
-    const { userPoolSize } = this._config;
-
     while (!this._stopped) {
       try {
         await this._rateLimiter.acquire(1);
 
-        // Pick a random user
-        const num = 1 + Math.floor(Math.random() * userPoolSize);
-        const userId = `user_${String(num).padStart(6, '0')}`;
+        const userId = this._userSelector.pickUserId();
 
         const start = performance.now();
 

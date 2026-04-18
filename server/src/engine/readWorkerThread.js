@@ -16,6 +16,7 @@ const {
   concurrency,
   initialReadRPS,
   maxReadRPS,
+  zipfExponent,
 } = workerData;
 
 let client;
@@ -40,6 +41,7 @@ async function init() {
   reader = new ReadWorker(collection, rateLimiter, {
     userPoolSize,
     concurrency,
+    zipfExponent,
   });
 
   // Seed cache, then signal ready

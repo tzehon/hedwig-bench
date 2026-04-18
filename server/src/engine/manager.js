@@ -200,6 +200,7 @@ export class RunManager {
         initialReadRPS,
         maxReadRPS,
         threadCount: this._config.readWorkerThreads ?? 4,
+        zipfExponent: this._config.zipfExponent ?? 0,
       });
 
       // ── 8. Create mutation worker (updates + deletes on existing docs) ──
@@ -209,6 +210,7 @@ export class RunManager {
       this._mutation = new MutationWorker(this._collection, this._mutationRateLimiter, {
         userPoolSize: this._config.userPoolSize,
         concurrency: 10,
+        zipfExponent: this._config.zipfExponent ?? 0,
       });
 
       // ── 9. Create metrics collector ──

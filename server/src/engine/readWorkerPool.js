@@ -65,6 +65,7 @@ export class ReadWorkerPool {
             concurrency: workerConcurrency,
             initialReadRPS: workerRate,
             maxReadRPS: Math.ceil(maxReadRPS / this._threadCount),
+            zipfExponent: this._config.zipfExponent ?? 0,
           },
         },
       );
