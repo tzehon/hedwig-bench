@@ -109,15 +109,31 @@ export class MutationWorker {
           continue;
         }
 
-        await this._rateLimiter.acquire(1);
-
-        const userId = this._userSelector.pickUserId();
-        const msgId = this._knownMsgIds.get(userId);
-
-        // Skip if no cached msg_id — can't mutate a doc we don't know exists
-        if (!msgId) {
-          continue;
+        // Find a user with a cached msg_id before acquiring a token
+        let userId;
+        let msgId;
+        for (let attempt = 0; attempt < 10; attempt++) {
+          userId = this._userSelector.pickUserId();
+          msgId = this._knownMsgIds.get(userId);
+          if (msgId) break;
         }
+        if (!msgId) {
+          // No cached users found — refill cache from a quick query
+          try {
+            const doc = await this._collection.findOne(
+              { user_id: userId },
+              { projection: { user_id: 1, msg_id: 1 } },
+            );
+            if (doc?.msg_id) {
+              this._knownMsgIds.set(doc.user_id, doc.msg_id);
+              msgId = doc.msg_id;
+              userId = doc.user_id;
+            }
+          } catch {}
+          if (!msgId) continue;
+        }
+
+        await this._rateLimiter.acquire(1);
 
         const op = pickMutationOp();
         const start = performance.now();
@@ -133,8 +149,20 @@ export class MutationWorker {
           }
           case 'delete': {
             await this._collection.deleteOne({ user_id: userId, msg_id: msgId });
-            // Remove from cache so future reads don't try to find deleted doc
-            this._knownMsgIds.delete(userId);
+            // Replace cached msg_id with another doc for this user (if any)
+            try {
+              const replacement = await this._collection.findOne(
+                { user_id: userId },
+                { projection: { msg_id: 1 } },
+              );
+              if (replacement?.msg_id) {
+                this._knownMsgIds.set(userId, replacement.msg_id);
+              } else {
+                this._knownMsgIds.delete(userId);
+              }
+            } catch {
+              this._knownMsgIds.delete(userId);
+            }
             break;
           }
           case 'update_content': {
