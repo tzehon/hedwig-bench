@@ -209,7 +209,7 @@ export class RunManager {
       this._mutationRateLimiter = new RateLimiter(mutationRPS, mutationRPS);
       this._mutation = new MutationWorker(this._collection, this._mutationRateLimiter, {
         userPoolSize: this._config.userPoolSize,
-        concurrency: 10,
+        concurrency: this._config.mutationConcurrency ?? 50,
         zipfExponent: this._config.zipfExponent ?? 0,
       });
 

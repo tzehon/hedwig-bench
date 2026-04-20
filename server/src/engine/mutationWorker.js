@@ -12,7 +12,7 @@
 
 import { UserSelector } from './userSelector.js';
 
-const DEFAULT_CONCURRENCY = 10;
+const DEFAULT_CONCURRENCY = 50;
 const STATUSES = ['delivered', 'read', 'unread'];
 
 const MUTATION_OPS = [
@@ -77,6 +77,7 @@ export class MutationWorker {
    */
   async seedCache() {
     try {
+      // Seed with random sample for broad coverage
       const docs = await this._collection
         .aggregate([{ $sample: { size: 50000 } }, { $project: { user_id: 1, msg_id: 1 } }])
         .toArray();
@@ -85,6 +86,22 @@ export class MutationWorker {
           this._knownMsgIds.set(doc.user_id, doc.msg_id);
         }
       }
+
+      // Also seed hot Zipf users directly — these are the ones we'll mutate most
+      const promises = [];
+      for (let i = 1; i <= 1000; i++) {
+        const userId = `user_${String(i).padStart(6, '0')}`;
+        if (!this._knownMsgIds.has(userId)) {
+          promises.push(
+            this._collection.findOne({ user_id: userId }, { projection: { user_id: 1, msg_id: 1 } })
+              .then((doc) => {
+                if (doc?.msg_id) this._knownMsgIds.set(doc.user_id, doc.msg_id);
+              })
+              .catch(() => {}),
+          );
+        }
+      }
+      await Promise.all(promises);
     } catch {
       // Collection may be empty — that's fine
     }
@@ -149,20 +166,8 @@ export class MutationWorker {
           }
           case 'delete': {
             await this._collection.deleteOne({ user_id: userId, msg_id: msgId });
-            // Replace cached msg_id with another doc for this user (if any)
-            try {
-              const replacement = await this._collection.findOne(
-                { user_id: userId },
-                { projection: { msg_id: 1 } },
-              );
-              if (replacement?.msg_id) {
-                this._knownMsgIds.set(userId, replacement.msg_id);
-              } else {
-                this._knownMsgIds.delete(userId);
-              }
-            } catch {
-              this._knownMsgIds.delete(userId);
-            }
+            // Evict from cache — next pick for this user will re-seed via fallback findOne
+            this._knownMsgIds.delete(userId);
             break;
           }
           case 'update_content': {
