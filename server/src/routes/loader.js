@@ -61,18 +61,26 @@ router.post('/start', async (req, res) => {
       }
     }
 
-    // Set up sharding if needed (before bulk insert)
-    if (deploymentMode === 'sharded') {
-      let client;
+    // Set up sharding + indexes before bulk insert
+    {
+      let setupClient;
       try {
-        client = new MongoClient(config.mongoUri);
-        await client.connect();
-        const db = client.db(dbName);
-        await setupSharding(db, collectionName);
+        setupClient = new MongoClient(config.mongoUri);
+        await setupClient.connect();
+        const db = setupClient.db(dbName);
+        const col = db.collection(collectionName);
+
+        // Shard first (if sharded mode)
+        if (deploymentMode === 'sharded') {
+          await setupSharding(db, collectionName);
+        }
+
+        // Create indexes up front — they build incrementally during insertion
+        await setupIndexes(col, 'extended');
       } catch (err) {
-        return res.status(500).json({ error: `Sharding setup failed: ${err.message}` });
+        return res.status(500).json({ error: `Setup failed: ${err.message}` });
       } finally {
-        if (client) try { await client.close(); } catch {}
+        if (setupClient) try { await setupClient.close(); } catch {}
       }
     }
 
@@ -100,32 +108,9 @@ router.post('/start', async (req, res) => {
           broadcastProgress(jobId, { type: 'progress', data: { jobId, ...progress } });
         }
       },
-      // onComplete — create indexes after insertion, then broadcast final status
-      async (result) => {
-        // Broadcast insertion complete, indexes building
-        if (broadcastProgress) {
-          broadcastProgress(jobId, {
-            type: 'progress',
-            data: { jobId, ...result, status: 'building_indexes' },
-          });
-        }
-
-        // Create benchmark indexes on the loaded data
-        let indexClient;
-        try {
-          indexClient = new MongoClient(config.mongoUri);
-          await indexClient.connect();
-          const db = indexClient.db(dbName);
-          const col = db.collection(collectionName);
-          await setupIndexes(col, 'extended');
-          result.indexesCreated = true;
-        } catch (err) {
-          console.error(`Failed to create indexes for job ${jobId}:`, err.message);
-          result.indexesCreated = false;
-        } finally {
-          if (indexClient) try { await indexClient.close(); } catch {}
-        }
-
+      // onComplete
+      (result) => {
+        result.indexesCreated = true; // indexes were created up front
         if (broadcastProgress) {
           broadcastProgress(jobId, { type: 'status', data: { jobId, ...result } });
         }
