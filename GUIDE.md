@@ -71,6 +71,7 @@ Go back to the home page (`/`). Your URI is still saved.
 | Read isolation | 40% | 40% of run is read-only, 60% concurrent with writes |
 | Read lanes | 150 | Total lanes distributed across worker threads |
 | Read worker threads | 4 | Each thread has its own connection pool and event loop |
+| Read skew (Zipf) | 1.0 | 80/20 — top 20% users get 80% of reads (realistic) |
 | Spikes | 1 | Simulates a campaign blast |
 | Ramp | 60s | Gradual ramp to peak |
 | Sustain | 120s | 2 minutes at peak per spike |
@@ -187,9 +188,40 @@ The **Atlas Search** tab (`/search`) showcases full-text search, autocomplete, a
 
 ---
 
-## 7. Cleanup
+## 7. Data Loader
 
-### Option A: In-app cleanup
+The **Data Loader** tab (`/loader`) bulk-inserts documents using parallel worker threads for maximum throughput.
+
+### Setup
+
+1. Go to the **Data Loader** tab
+2. Enter your Atlas URI, database, and collection name
+3. Select **Replica Set** or **Sharded** deployment mode
+4. Configure: total docs, doc size, batch size, write concern, threads, lanes
+5. Optionally check **Drop collection before loading**
+6. Click **Start Loading**
+
+### Key settings for large loads (1B+)
+
+| Setting | Recommended | Why |
+|---------|-------------|-----|
+| Threads | 8 | 2 per shard for 4 shards |
+| Lanes per thread | 10 | 80 concurrent insertMany total |
+| Batch size | 1000 | Good throughput without hitting 16MB BSON limit |
+| Write concern | w:1 | Fastest insertion (data is reloaded if lost) |
+| Deployment mode | Sharded | Creates shard key + indexes before loading |
+
+Indexes are created **before** loading starts and build incrementally during insertion — no post-load index build wait.
+
+### Progress
+
+Real-time progress via WebSocket: docs inserted, insertion rate, elapsed time, ETA. The **Create Indexes** button can also be triggered independently.
+
+---
+
+## 8. Cleanup
+
+### Option A: In-app cleanup (Configure & Run page)
 
 1. Go to the home page (`/`)
 2. Scroll down and expand the **Cleanup** section

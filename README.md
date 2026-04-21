@@ -51,7 +51,7 @@ React Frontend  <--- WebSocket --->  Express Backend  --- mongodb --->  Atlas Cl
  Recharts)                            SQLite, WS)
 ```
 
-**Frontend pages:** Configure & Run, Live Dashboard, Results, History & Compare, Atlas Search, Query Demo
+**Frontend pages:** Configure & Run, Live Dashboard, Results, History & Compare, Atlas Search, Query Demo, Data Loader
 
 **Backend engine:** Document Gen, Spike Scheduler (write + read), Write Worker (50 lanes), Read Worker (50 lanes), Token-Bucket Rate Limiters, Metrics Collector
 
@@ -227,6 +227,8 @@ For each query, the results show:
 | Read | Isolation % | `40` | 0–80 | Variable mode: percentage of total run time that is read-only (no concurrent writes) |
 | Read | Concurrency (lanes) | `150` | 1–2,000 | Total concurrent read lanes distributed across worker threads. |
 | Read | Worker threads | `4` | 1–16 | Number of worker threads for reads. Each thread has its own event loop, connection pool, and rate limiter. Eliminates single-thread bottleneck. |
+| Read | Skew (Zipf exponent) | `1.0` | 0–1.5 | Access pattern skew. 0 = uniform random, 1.0 = standard Zipf (top 20% users get 80% of reads), 1.5 = heavy skew. |
+| Mutation | Rate | `1,480` | — | Avg mutation ops/sec: status updates (80), deletes (600), content updates (800). Runs during concurrent phase only. |
 | Spike | Number of spikes | `1` | 1–10 | How many write spikes |
 | Spike | Ramp-up (seconds) | `60` | 30–300 | Linear ramp from 0 → target RPS |
 | Spike | Sustain (seconds) | `120` | 30–600 | Hold at target RPS |
@@ -436,7 +438,9 @@ The load generation engine lives in `server/src/engine/`:
 | **Read Worker** | `reader.js` | Phase-aware read lanes: point reads (1 item) during concurrent, list queries (10–50 items, avg ~30) during isolation. Runs inside worker threads. |
 | **Read Worker Thread** | `readWorkerThread.js` | Worker thread entry point. Creates own MongoClient, RateLimiter, ReadWorker. Communicates with main thread via postMessage. |
 | **Metrics Collector** | `metrics.js` | Every second: drains worker accumulators, sorts latencies once, computes p50/p95/p99. Every 5 seconds: `serverStatus` for system metrics (per-second deltas). |
-| **Run Manager** | `manager.js` | Orchestrates: connect → (delete data / drop collection) → create indexes → generate schedule → start workers → tick loop (updates both write and read rate limiters each second) → cleanup. |
+| **Mutation Worker** | `mutationWorker.js` | 50 concurrent lanes for update status (5%), delete (41%), update content (54%). Uses Zipf-skewed user selection. Runs during concurrent phase only. |
+| **User Selector** | `userSelector.js` | Zipf-distributed user selection via pre-computed CDF lookup table. Configurable exponent (0 = uniform, 1.0 = 80/20 skew). |
+| **Run Manager** | `manager.js` | Orchestrates: connect → shard (if sharded) → create indexes → generate schedule → start workers (writes, reads, mutations) → tick loop → cleanup. |
 
 **Concurrency model**: Writes use async concurrency pools on the main thread. Reads run in N worker threads (default 4), each with its own event loop, MongoDB connection pool, and rate limiter. This eliminates the single-thread bottleneck that inflates read latency under high concurrent load.
 
@@ -576,7 +580,8 @@ hedwig-bench/
 │       │   ├── ResultsPage.jsx     # Summary cards (p50/p90/p99), charts, export
 │       │   ├── HistoryPage.jsx     # Runs table, multi-run comparison, clear history
 │       │   ├── SearchPage.jsx      # Atlas Search showcase (full-text, autocomplete)
-│       │   └── QueryPage.jsx       # Query Demo (3 patterns, explain, index used)
+│       │   ├── QueryPage.jsx       # Query Demo (3 patterns, explain, index used)
+│       │   └── DataLoaderPage.jsx  # Bulk data loader with progress tracking
 │       └── lib/
 │           ├── api.js              # REST client (fetch) + WebSocket factory
 │           └── spike.js            # Client-side schedule generator (write + read, for previews)
@@ -588,7 +593,8 @@ hedwig-bench/
 │       ├── routes/
 │       │   ├── runs.js             # Benchmark API + summary computation + cleanup
 │       │   ├── search.js           # Atlas Search API (connect, index, query, autocomplete)
-│       │   └── queries.js          # Query Demo API (run, explain, sample-ids)
+│       │   ├── queries.js          # Query Demo API (run, explain, sample-ids)
+│       │   └── loader.js           # Data Loader API (start, stop, status, indexes)
 │       ├── db/
 │       │   └── database.js         # SQLite (better-sqlite3) CRUD layer
 │       └── engine/
@@ -599,7 +605,13 @@ hedwig-bench/
 │           ├── writer.js           # Write worker (50 lanes, bulk/single, uncapped mode)
 │           ├── reader.js           # Read worker (50 lanes, 3 query patterns)
 │           ├── metrics.js          # Per-second + system metrics (per-doc latency)
-│           └── manager.js          # Run lifecycle orchestrator
+│           ├── manager.js          # Run lifecycle orchestrator
+│           ├── mutationWorker.js   # Update/delete operations (50 lanes)
+│           ├── userSelector.js     # Zipf-distributed user selection
+│           ├── readWorkerPool.js   # Multi-threaded read pool manager
+│           ├── readWorkerThread.js # Worker thread entry point for reads
+│           ├── insertWorkerPool.js # Multi-threaded bulk insert pool
+│           └── insertWorkerThread.js # Worker thread entry point for inserts
 │
 └── server/data/                    # Created at runtime
     └── hedwig-bench.db             # SQLite database (gitignored)
